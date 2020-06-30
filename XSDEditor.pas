@@ -113,6 +113,10 @@ const
    TUB ='Tubular.xsd';
    JOB ='StimJob.xsd';
    WELL ='Well.xsd';
+   SP ='SurveyProgram.xsd';
+   WG ='WellboreGeometry.xsd';
+   WELLC ='WellboreCompletion.xsd';
+   WELLB ='WellBore.xsd';
 
 implementation
 
@@ -408,12 +412,16 @@ end;
 
 procedure TFormXSD.FormCreate(Sender: TObject);
 begin
-//  ShowAnnotation := True;
+  ShowAnnotation := True;
   ParentTypeAnnotation := True;
 //  AutoGenerateRepeatedElement := True;
   IgnoreAnnotations := ['AbstractString', 'TypeEnum'];
   TDirectory.SetCurrentDirectory(WITS_DIR);
-  doc := LoadXMLSchema(WELL);
+//  doc := LoadXMLSchema(WELL);
+//  doc := LoadXMLSchema(WELLB);
+//  doc := LoadXMLSchema(WELLC);
+//  doc := LoadXMLSchema(SP);
+  doc := LoadXMLSchema(WG);
 //  doc := LoadXMLSchema(LOG);
 //  doc := LoadXMLSchema(TUB);
 //  doc := LoadXMLSchema(JOB);
