@@ -495,7 +495,12 @@ begin
     var nd := PnodeExData(n.GetData);
     nd.node := a;
     nd.nodeType := a.DataType;
-    if a.Use = 'required' then Include(n.States, vsExpanded);
+    if a.Use = 'required' then
+     begin
+      Include(n.States, vsExpanded);
+      nd.Columns[COLL_VAL].Valid := False;
+     end;
+
     Tree.InvalidateNode(n);
    end;
 end;
@@ -650,7 +655,11 @@ begin
     var nd := PnodeExData(n.GetData);
     nd.node := e;
     nd.nodeType := e.DataType;
-    if nd.MastExists then Include(n.States, vsExpanded);
+    if nd.MastExists then
+     begin
+      Include(n.States, vsExpanded);
+      nd.Columns[COLL_VAL].Valid := False;
+     end;
     Tree.InvalidateNode(n);
    end;
 end;
