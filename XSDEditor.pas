@@ -84,9 +84,9 @@ type
     procedure AddComplexHistory(root: PVirtualNode);
     procedure AddElemGroup(Node: PVirtualNode; group: IXMLElementGroup);
     procedure TST_SaveTmpFile(Fname: string);
-    // ошибка в положении элементов <xs:group ref = "..."> в проследовательности <xs:sequence
+    // исправление ошибки в положении элементов <xs:group ref = "..."> в проследовательности <xs:sequence
     procedure PatchGroupSeqPosition(group: PVirtualNode);
-    // вспомогательная функция для  PatchGroupSeqPosition
+    // вспомогательная функция для PatchGroupSeqPosition и др..
     function FindTreeNode(root: PVirtualNode; const columnTree: string; FindInGroup: Boolean = False): PVirtualNode;
     function FindRepeaterNode(elem: PVirtualNode): PVirtualNode;
   private
@@ -114,6 +114,10 @@ const
    TUB ='Tubular.xsd';
    JOB ='StimJob.xsd';
    WELL ='Well.xsd';
+   SP ='SurveyProgram.xsd';
+   WG ='WellboreGeometry.xsd';
+   WELLC ='WellboreCompletion.xsd';
+   WELLB ='WellBore.xsd';
 
 implementation
 
@@ -240,7 +244,11 @@ begin
   SetLength(Columns, COLL_COUNT);
   nt := NodeType;
   node := SchemaItem;
-  for var I := 0 to High(Columns) do Columns[i].Value := '';
+  for var I := 0 to High(Columns) do
+   begin
+    Columns[i].Value := '';
+    Columns[i].Valid := True;
+   end;
 end;
 
 function TTreeData.tip: IXMLTypeDef;
@@ -312,6 +320,7 @@ begin
         n.columns[COLL_UOM].Value := '?';
        end;
      end;
+    if n.MastExists then n.Columns[COLL_VAL].Valid := False;
     n.columns[COLL_UOM].Value := TEST_GetSimple(e.DataType);
    end
   else
@@ -332,6 +341,7 @@ begin
   n.columns[COLL_TREE].Value := e.Name;
   n.columns[COLL_TYPE].Value := e.DataTypeName;
   n.Columns[COLL_VAL].EditType := GetEditorType(e);
+  if n.MastExists then n.Columns[COLL_VAL].Valid := False;
   n.columns[COLL_UOM].Value := TEST_GetSimple(e.DataType);
 end;
 
@@ -486,7 +496,12 @@ begin
     var nd := PnodeExData(n.GetData);
     nd.node := a;
     nd.nodeType := a.DataType;
-    if a.Use = 'required' then Include(n.States, vsExpanded);
+    if a.Use = 'required' then
+     begin
+      Include(n.States, vsExpanded);
+      nd.Columns[COLL_VAL].Valid := False;
+     end;
+
     Tree.InvalidateNode(n);
    end;
 end;
@@ -604,16 +619,22 @@ end;
 
 function TFormXSD.AddChoice(Node: PVirtualNode; comp: IXMLElementCompositor): PVirtualNode;
 begin
-  if IsRepeatingValue(comp) then raise Exception.Create('Error Message: choise repeated TODO: ');
-  Result := Tree.AddChild(Node);
-  var nd := PNodeExData(Result.GetData);
+  if IsRepeatingValue(comp) then
+   begin
+    raise Exception.Create('Error Message: choise repeated TODO: ');
+   end
+  else
+   begin
+    Result := Tree.AddChild(Node);
+    var nd := PNodeExData(Result.GetData);
 
-  TTreeData.Choice(nd, comp);
-  if nd.MastExists then Include(Result.States, vsExpanded);
+    TTreeData.Choice(nd, comp);
+    if nd.MastExists then Include(Result.States, vsExpanded);
 
-  AddAnnotation(Result, comp);
+    AddAnnotation(Result, comp);
 
-  AddComplexHistory(Result);
+    AddComplexHistory(Result);
+   end;
 end;
 
 procedure TFormXSD.AddComplexcontent(Node: PVirtualNode; comp: IXMLElementCompositor);
@@ -635,7 +656,11 @@ begin
     var nd := PnodeExData(n.GetData);
     nd.node := e;
     nd.nodeType := e.DataType;
-    if nd.MastExists then Include(n.States, vsExpanded);
+    if nd.MastExists then
+     begin
+      Include(n.States, vsExpanded);
+      nd.Columns[COLL_VAL].Valid := False;
+     end;
     Tree.InvalidateNode(n);
    end;
 end;
@@ -717,29 +742,17 @@ begin
 //
 end;
 
-procedure TFormXSD.TreeGetImageIndex(Sender: TBaseVirtualTree; Node: PVirtualNode; Kind: TVTImageKind;
-  Column: TColumnIndex; var Ghosted: Boolean; var ImageIndex: TImageIndex);
- var
-  nd: PNodeExData;
-begin
-  if not (Kind in [ikNormal, ikSelected]) then Exit;
-  nd := Tree.GetNodeData(Node);
-  if (Column = COLL_TREE) then
-   begin
-    if nd.nt in [ntElemRoot, ntGroup] then
-      if vsExpanded in Node.States then ImageIndex := 2
-      else ImageIndex := 1
-    else if nd.MastExists then ImageIndex := 5;
-   end;
-  if (Column = COLL_TYPE) then
-   begin
-    if nd.MastExists then ImageIndex := 5;
-   end;
-end;
-
 procedure TFormXSD.TreeGetNodeDataSize(Sender: TBaseVirtualTree; var NodeDataSize: Integer);
 begin
   NodeDataSize := SizeOf(TTreeData);
+end;
+
+procedure TFormXSD.TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
+ var
+  nd: PNodeExData;
+begin
+  nd := Tree.GetNodeData(Node);
+  Finalize(nd^);
 end;
 
 procedure TFormXSD.DeleteClick(Sender: TObject);
@@ -769,33 +782,6 @@ begin
    end;
 end;
 
-procedure TFormXSD.TreeMeasureItem(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode; var NodeHeight: Integer);
-begin
-  if Sender.MultiLine[Node] then
-  begin
-    TargetCanvas.Font := Sender.Font;
-    NodeHeight := Max(Tree.ComputeNodeHeight(TargetCanvas, Node, COLL_TREE),
-                      Tree.ComputeNodeHeight(TargetCanvas, Node, COLL_UOM)) + 10;
-  end;
-  // ...else use what's set by default.
-end;
-
-procedure TFormXSD.TreeBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode;
- Column: TColumnIndex; CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
-begin
-  // Fill random cells with our own background, but don't touch the currently focused cell.
-  if Assigned(Node) and ((Column <> Sender.FocusedColumn) or (Node <> Sender.FocusedNode)) then
-  begin
-    var nd := PnodeExData(Node.GetData);
-    if (nd.nt in [ntElemEditable, ntAttr]) and nd.MastExists and (Column = COLL_VAL)
-       and (Trim(nd.Columns[Column].Value) = '') then
-     begin
-      TargetCanvas.Brush.Color := $E0E0FF;
-      TargetCanvas.FillRect(CellRect);
-     end;
-  end;
-end;
-
 procedure TFormXSD.TreeChecking(Sender: TBaseVirtualTree; Node: PVirtualNode; var NewState: TCheckState; var Allowed: Boolean);
 begin
   if PnodeExData(Node.GetData).nt = ntRepeater then InsertRepeatedElem(Node);
@@ -816,7 +802,7 @@ end;
 
 procedure TFormXSD.TreeEditing(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; var Allowed: Boolean);
 begin
-  if Node.GetData<TTreeData>().Columns[Column].EditType <> etNone then Allowed := True;
+  if PnodeExData(Node.GetData).Columns[Column].EditType <> etNone then Allowed := True;
 end;
 
 procedure TFormXSD.TreeFocusChanged(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex);
@@ -860,12 +846,15 @@ begin
   else if Tree.GetNext(NewNode) = OldNode then  Tree.FocusedNode := Tree.GetPrevious(NewNode)
  end;
 
-procedure TFormXSD.TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
- var
-  nd: PNodeExData;
+procedure TFormXSD.TreeMeasureItem(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode; var NodeHeight: Integer);
 begin
-  nd := Tree.GetNodeData(Node);
-  Finalize(nd^);
+  if Sender.MultiLine[Node] then
+  begin
+    TargetCanvas.Font := Sender.Font;
+    NodeHeight := Max(Tree.ComputeNodeHeight(TargetCanvas, Node, COLL_TREE),
+                      Tree.ComputeNodeHeight(TargetCanvas, Node, COLL_UOM)) + 10;
+  end;
+  // ...else use what's set by default.
 end;
 
 procedure TFormXSD.TreeGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
@@ -873,10 +862,8 @@ procedure TFormXSD.TreeGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Col
   nd: PNodeExData;
 begin
   nd := Tree.GetNodeData(Node);
-  if (Column >=0) and (Column < Length(nd.columns)) then
-      CellText := nd.columns[Column].Value
-  else
-      CellText := '';
+  if (Column >=0) and (Column < Length(nd.columns)) then CellText := nd.columns[Column].Value
+  else CellText := '';
 end;
 
 procedure TFormXSD.TreeInitNode(Sender: TBaseVirtualTree; ParentNode, Node: PVirtualNode; var InitialStates: TVirtualNodeInitStates);
@@ -886,6 +873,47 @@ begin
   nd := Tree.GetNodeData(Node);
   Node.Align := 12; // Alignment of expand/collapse button nearly at the top of the node.
   if nd.nt = ntDoc then Include(InitialStates, ivsMultiline);
+end;
+
+procedure TFormXSD.TreeBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode;
+ Column: TColumnIndex; CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
+begin
+  // Fill random cells with our own background, but don't touch the currently focused cell.
+  if Assigned(Node) and ((Column <> Sender.FocusedColumn) or (Node <> Sender.FocusedNode)) then
+  begin
+    var nd := PnodeExData(Node.GetData);
+    if (nd.nt in [ntElemEditable, ntAttr]) and (Column = COLL_VAL)
+       and not nd.Columns[Column].Valid then
+     begin
+      TargetCanvas.Brush.Color := $E0E0FF;
+      TargetCanvas.FillRect(CellRect);
+     end
+    else if nd.Columns[Column].Dirty then
+     begin
+      TargetCanvas.Brush.Color := $E0FFFF;
+      TargetCanvas.FillRect(CellRect);
+     end;
+  end;
+end;
+
+procedure TFormXSD.TreeGetImageIndex(Sender: TBaseVirtualTree; Node: PVirtualNode; Kind: TVTImageKind;
+  Column: TColumnIndex; var Ghosted: Boolean; var ImageIndex: TImageIndex);
+ var
+  nd: PNodeExData;
+begin
+  if not (Kind in [ikNormal, ikSelected]) then Exit;
+  nd := Tree.GetNodeData(Node);
+  if (Column = COLL_TREE) then
+   begin
+    if nd.nt in [ntElemRoot, ntGroup] then
+      if vsExpanded in Node.States then ImageIndex := 2
+      else ImageIndex := 1
+    else if nd.MastExists then ImageIndex := 5;
+   end;
+  if (Column = COLL_TYPE) then
+   begin
+    if nd.MastExists then ImageIndex := 5;
+   end;
 end;
 
 procedure TFormXSD.TreePaintText(Sender: TBaseVirtualTree; const TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType);

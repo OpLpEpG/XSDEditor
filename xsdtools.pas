@@ -2,7 +2,8 @@ unit xsdtools;
 
 interface
 
-uses SysUtils, System.typinfo, Xml.XMLSchemaTags, XmlSchema,Xml.XMLIntf, Xml.XMLDoc, System.Variants;
+uses SysUtils, System.typinfo, Xml.XMLSchemaTags, XmlSchema,Xml.XMLIntf, Xml.XMLDoc, System.Variants,
+     System.RegularExpressions;
 
  type
   baseXSD = (
@@ -90,7 +91,7 @@ const
     btRecurringDuration,        { removed }
     btCentury];
 
-  XSDTypeDecinal = [btDecimal, // base
+  XSDTypeDecimal = [btDecimal, // base
     btInteger, // from btDecimal base
     btNonPositiveInteger,
     btNegativeInteger,
@@ -189,6 +190,7 @@ function HistoryHasValue(SimpleType: IXMLTypeDef): THistory;
 type
   TWolkHistorySimpleFunc = reference to function (Simple: IXMLSimpleTypeDef): Boolean;
 procedure WolkHistorySimple(Root: TSimpleHistory; func: TWolkHistorySimpleFunc);
+function GetBuildInTypes(Hist: TSimpleHistory): TArray<baseXSD>;
 // энумерация с документацией элементов
 // SimpleType - простой элемнт или комплексн. простой
 procedure PatchAnnotatedEnumeration(SimpleType: IXMLTypeDef);
@@ -197,9 +199,66 @@ function TypeHasValue(e: IXMLTypeDef): Boolean;
 function FindAbstractChilds(AbstractType: IXMLComplexTypeDef):TArray<IXMLComplexTypeDef>;
 
 function GetGlobalName(Schema: IXMLSchemaDef; const LocalName: string): string;
-function IsRepeatingValue(elem: IXMLElementCompositor): Boolean;overload;
-function IsRepeatingValue(elem: IXMLElementDef): Boolean;overload;
+function IsRepeatingValue(elem: IXMLElementCompositor): Boolean; overload;
+function IsRepeatingValue(elem: IXMLElementDef): Boolean; overload;
 //function CloneElement(elemToClone: IXMLElementDef): IXMLElementDef;
+
+function ValidateData(data: IXMLTypeDef; var Value: Variant): Boolean;
+
+type
+ TCheckError=(
+    cherLength,
+    cherMinLength,
+    cherMaxLength,
+    cherPattern,
+    cherWhitespace,
+    cherMaxInclusive,
+    cherMaxExclusive,
+    cherMinInclusive,
+    cherMinExclusive,
+    cherTotalDigits,
+    cherFractionalDigits,
+    cherEnumeration,
+    cherFloat,
+    cherInt);
+
+  TValidateErrorData = record
+    TypeName: string;
+    CheckError: TCheckError;
+    FacetData: Variant;
+    FacetErrorData: Variant;
+    Value: Variant;
+    ErrorString: string;
+  end;
+
+const
+ CHECK_ERR: array[TCheckError] of string = (
+    'Length',
+    'MinLength',
+    'MaxLength',
+    'Pattern',
+    'Whitespace',
+    'MaxInclusive',
+    'MaxExclusive',
+    'MinInclusive',
+    'MinExclusive',
+    'TotalDigits',
+    'FractionalDigits',
+    'Enumeration',
+    'Float',
+    'Int');
+
+function GetValidateError: TValidateErrorData;
+function SetValidateError(const TypeName: string;
+                          CheckError: TCheckError;
+                          FacetData: Variant;
+                          FacetErrorData: Variant;
+                          Value: Variant;
+                          const ErrString: string): Boolean;
+type TCheckUserType = function(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
+function CheckUserTypes(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
+procedure RegisterCheckUserType(const TypeName: string; func: TCheckUserType);
+procedure RegisterCheckBuildInType(const TypeName: string; func: TCheckUserType);
 
 type
   TXSEnum<T: IXMLSchemaNode> = record
@@ -262,8 +321,240 @@ begin
   SetAttribute(SValue, Value);
 end;
 
-function IsRepeatingValue(elem: IXMLElementCompositor): Boolean;overload;
+function PatchAnnotatedEnumerationItem(st: IXMLSimpleTypeDef): boolean;
+ var
+  str: IXMLSimpleTypeRestriction;
+begin
+  Result := False;
+  if Supports(st.ContentNode, IXMLSimpleTypeRestriction, str) then
+    (str as IXMLNodeAccess).RegisterChildNode(xsfEnumeration, TXMLAnnotatedEnumeration);
+end;
+
+procedure PatchAnnotatedEnumeration(SimpleType: IXMLTypeDef);
+begin
+  WolkHistorySimple(HistoryHasValue(SimpleType).BaseSimple, PatchAnnotatedEnumerationItem);
+end;
+
+{$REGION 'ValidateData'}
+ var
+  LastValidateErrorData: TValidateErrorData;
+function GetValidateError: TValidateErrorData;
+begin
+  Result := LastValidateErrorData;
+end;
+
+function SetValidateError(const TypeName: string;
+                          CheckError: TCheckError;
+                          FacetData: Variant;
+                          FacetErrorData: Variant;
+                          Value: Variant;
+                          const ErrString: string): Boolean;
+begin
+  Result := False;
+  LastValidateErrorData.TypeName :=  TypeName;
+  LastValidateErrorData.CheckError := CheckError;
+  LastValidateErrorData.FacetData := FacetData;
+  LastValidateErrorData.FacetErrorData := FacetErrorData;
+  LastValidateErrorData.Value := Value;
+  LastValidateErrorData.ErrorString := ErrString;
+end;
+
+type
+ TUserTypeData=record
+   Name: string;
+   func: TCheckUserType;
+ end;
+
 var
+ GlobalUserTypeData: TArray<TUserTypeData>;
+ GlobalBuildTypeData: TArray<TUserTypeData>;
+
+procedure RegisterCheckUserType(const TypeName: string; func: TCheckUserType);
+ var
+  d: TUserTypeData;
+begin
+  for var i := 0 to High(GlobalUserTypeData) do
+   if SameText(GlobalUserTypeData[i].Name, TypeName) then
+    begin
+     GlobalUserTypeData[i].func := func;
+     Exit;
+    end;
+  d.Name := TypeName;
+  d.func := func;
+  GlobalUserTypeData := GlobalUserTypeData + [d];
+end;
+
+procedure RegisterCheckBuildInType(const TypeName: string; func: TCheckUserType);
+ var
+  d: TUserTypeData;
+begin
+  for var i := 0 to High(GlobalBuildTypeData) do
+   if SameText(GlobalBuildTypeData[i].Name, TypeName) then
+    begin
+     GlobalBuildTypeData[i].func := func;
+     Exit;
+    end;
+  d.Name := TypeName;
+  d.func := func;
+  GlobalBuildTypeData := GlobalBuildTypeData + [d];
+end;
+
+function CheckUserTypes(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
+begin
+  Result := True;
+  for var utd in GlobalUserTypeData do
+     if SameText(utd.Name, st.Name) then
+       if not utd.func(st, val) then Exit(False);
+end;
+
+function CheckBuildInTypes(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
+begin
+  Result := True;
+  for var utd in GlobalBuildTypeData do
+     if SameText(utd.Name, st.Name) then
+       if not utd.func(st, val) then Exit(False);
+end;
+
+const
+  E_LENGTH    = 'error %s Length %d <> %d %s';
+  E_MINLENGTH = 'error %s MinLength %d > %d %s';
+  E_MAXLENGTH = 'error %s MaxLength %d < %d %s';
+  E_PATTERN =   'error %s Pattern [%s] not match %s';
+  E_MAXI = 'error %s MaxInclusive=%s < %s';
+  E_MAXE = 'error %s MaxExclusive=%s <= %s';
+  E_MINI = 'error %s MinInclusive=%s > %s';
+  E_MINE = 'error %s MinExclusive=%s >= %s';
+  E_ENUM = 'error %s Enumeration(%d) not have %s';
+function CheckFacets(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
+ var
+  s: string;
+begin
+  Result := True;
+  s := VarToStr(val);
+  if not VarIsNull(st.Length) then
+   begin
+    if st.Length <> s.Length then
+       Exit(SetValidateError(st.Name, cherLength, st.Length, s.Length, val,
+                             Format(E_LENGTH,[st.Name, Integer(st.Length), s.Length, Val])));
+   end
+  else if not VarIsNull(st.MinLength) then
+   begin
+    if st.MinLength > s.Length then
+       Exit(SetValidateError(st.Name, cherMinLength, st.MinLength, s.Length, val,
+                             Format(E_MINLENGTH,[st.Name, Integer(st.MinLength), s.Length, Val])));
+   end
+  else if not VarIsNull(st.MaxLength) then
+   begin
+    if st.MaxLength < s.Length then
+        Exit(SetValidateError(st.Name, cherMaxLength, st.MaxLength, s.Length, val,
+                              Format(E_MAXLENGTH,[st.Name, Integer(st.MaxLength), s.Length, Val])));
+   end
+  else if not VarIsNull(st.Pattern) then
+   begin
+    if not TRegEx.Match(val, VarToStr(st.Pattern)).Success then
+      Exit(SetValidateError(st.Name, cherPattern, st.Pattern, '', val,
+                            Format(E_PATTERN,[st.Name, st.Pattern, Val])));
+   end
+  else if not VarIsNull(st.Whitespace) then
+   begin
+    if st.Whitespace = 'replace' then val := TRegEx.Replace(S, '\s', ' ')
+    else if st.Whitespace = 'collapse' then val := TRegEx.Replace(S, '\s+', ' ');
+   end
+  else if not VarIsNull(st.MaxInclusive) then
+   begin
+    if st.MaxInclusive <= StrToFloat(VarToStr(val)) then
+      Exit(SetValidateError(st.Name, cherMaxInclusive, st.MaxInclusive, '', val,
+                            Format(E_MAXI,[st.Name, st.MaxInclusive, val])));
+   end
+  else if not VarIsNull(st.MaxExclusive) then
+   begin
+    if st.MaxExclusive < StrToFloat(VarToStr(val)) then
+      Exit(SetValidateError(st.Name, cherMaxExclusive, st.MaxExclusive, '', val,
+                            Format(E_MAXE,[st.Name, st.MaxExclusive, val])));
+   end
+  else if not VarIsNull(st.MinInclusive) then
+   begin
+    if st.MinInclusive >= StrToFloat(VarToStr(val)) then
+      Exit(SetValidateError(st.Name, cherMinInclusive, st.MinInclusive, '', val,
+                            Format(E_MINI,[st.Name, st.MinInclusive, val])));
+   end
+  else if not VarIsNull(st.MinExclusive) then
+   begin
+    if st.MinExclusive > StrToFloat(VarToStr(val)) then
+      Exit(SetValidateError(st.Name, cherMinExclusive, st.MinExclusive, '', val,
+                            Format(E_MINE,[st.Name, st.MinExclusive, val])));
+   end
+  else if st.Enumerations.Count > 0 then
+   begin
+    for var e in TXSEnum<IXMLEnumeration>.XEnum(st.Enumerations) do if SameStr(e.Value, val) then Exit;
+    Exit(SetValidateError(st.Name, cherEnumeration, st.Enumerations.Count, '', val,
+                          Format(E_ENUM,[st.Name, st.Enumerations.Count, val])));
+   end
+  else if not VarIsNull(st.TotalDigits) then
+     begin
+      var fd := 0;
+      if not VarIsNull(st.FractionalDigits) then fd := st.FractionalDigits;
+      val := FloatToStrF(val, ffGeneral, st.TotalDigits, fd);
+    end;
+end;
+
+function CheckSimpleData(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
+begin
+  Result := True;
+  if st.IsBuiltInType then Exit(CheckBuildInTypes(st, val));
+  if not CheckUserTypes(st, val) then Exit(False);
+  if not CheckFacets(st, val) then Exit(False);
+end;
+
+function ValidateData(data: IXMLTypeDef; var Value: Variant): Boolean;
+  function Check(item: TSimpleHistory): boolean;
+  begin
+    Result := True;
+    if not CheckSimpleData(item.SimpleType, Value) then Exit(False);
+    for var t in item.BaseArray do if not Check(t) then Exit(False);
+  end;
+begin
+  LastValidateErrorData.ErrorString := '';
+  Result := Check(HistoryHasValue(data).BaseSimple);
+end;
+
+function CheckFloat(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
+begin
+  Result := True;
+  try
+   Val := VarAsType(val, varDouble);
+  except
+   on E: Exception do Result := SetValidateError(st.Name, cherFloat, '', '', val,
+                      Format('err name: %s not float (%s) - %s', [st.Name, val, e.Message]));
+  end;
+end;
+
+function CheckInt(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
+begin
+  Result := True;
+  try
+   Val := VarAsType(val, varInteger);
+  except
+   on E: Exception do Result := SetValidateError(st.Name, cherInt, '', '', val,
+                      Format('err name: %s not Integer (%s) - %s', [st.Name, val, e.Message]));
+  end;
+end;
+
+const
+ ANYURI_PARRERN ='^([a-z][a-z0-9\*\-\.]*):\/\/(?:(?:(?:[\w\.\-\+!$&''\(\)*\+,;=]|%[0-9a-f]{2})+:)'+
+ '*(?:[\w\.\-\+%!$&''\(\)*\+,;=]|%[0-9a-f]{2})+@)?(?:(?:[a-z0-9\-\.]|%[0-9a-f]{2})+|(?:\[(?:[0-9a-f]'+
+ '{0,4}:)*(?:[0-9a-f]{0,4})\]))(?::[0-9]+)?(?:[\/|\?](?:[\w#!:\.\?\+=&@!$''~*,;\/\(\)\[\]\-]|%[0-9a-f]{2})*)?$';
+function CheckAnyURI(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
+begin
+  Result := True;
+  if not TRegEx.Match(val, ANYURI_PARRERN).Success then
+      Exit(SetValidateError(st.Name, cherPattern, ANYURI_PARRERN, '', val,
+                            Format(E_PATTERN,[st.Name, 'ANYURI_PARRERN', Val])));
+end;
+{$ENDREGION 'ValidateData'}
+
+function IsRepeatingValue(elem: IXMLElementCompositor): Boolean;overload;
+ var
   S: string;
 begin
   S := VarToStr(elem.MaxOccurs);
@@ -271,7 +562,7 @@ begin
 end;
 
 function IsRepeatingValue(elem: IXMLElementDef): Boolean;overload;
-var
+ var
   S: string;
 begin
   S := VarToStr(elem.MaxOccurs);
@@ -305,31 +596,6 @@ end;
 function TypeHasValue(e: IXMLTypeDef): Boolean;
 begin
   Result := not (e.IsComplex and ((e as IXMLComplexTypeDef).DerivationMethod in COMPLEX_ROOT_ELEMENT))
-end;
-
-procedure WolkHistorySimple(Root: TSimpleHistory; func: TWolkHistorySimpleFunc);
- function Recur(r: TSimpleHistory): Boolean;
- begin
-   Result := False;
-   if func(r.SimpleType) then Exit(True);
-   for var bt in r.BaseArray do if Recur(bt) then Exit(True);
- end;
-begin
-  Recur(Root);
-end;
-
-function PatchAnnotatedEnumerationItem(st: IXMLSimpleTypeDef): boolean;
- var
-  str: IXMLSimpleTypeRestriction;
-begin
-  Result := False;
-  if Supports(st.ContentNode, IXMLSimpleTypeRestriction, str) then
-    (str as IXMLNodeAccess).RegisterChildNode(xsfEnumeration, TXMLAnnotatedEnumeration);
-end;
-
-procedure PatchAnnotatedEnumeration(SimpleType: IXMLTypeDef);
-begin
-  WolkHistorySimple(HistoryHasValue(SimpleType).BaseSimple, PatchAnnotatedEnumerationItem);
 end;
 
 function GetAnnotation(e: IXMLAnnotatedItem; ParentTypeAnnotation: Boolean = False; const IgnoreItems: TArray<string> = []): string;
@@ -414,6 +680,37 @@ begin
    end;
 end;
 
+{$REGION 'History'}
+function GetBuildInTypes(Hist: TSimpleHistory): TArray<baseXSD>;
+ var
+  Res: TArray<baseXSD>;
+begin
+  Res := [];
+  WolkHistorySimple(Hist, function (st: IXMLSimpleTypeDef): Boolean
+  begin
+    Result := False;
+    if st.IsBuiltInType then
+     for var bt := btString to btCentury do
+      if SameStr(st.Name, baseXSDstring[bt]) then
+       begin
+        for var r in Res do if r = bt then Exit;
+        Res := Res + [bt];
+       end;
+  end);
+  Result := Res;
+end;
+
+procedure WolkHistorySimple(Root: TSimpleHistory; func: TWolkHistorySimpleFunc);
+ function Recur(r: TSimpleHistory): Boolean;
+ begin
+   Result := False;
+   if func(r.SimpleType) then Exit(True);
+   for var bt in r.BaseArray do if Recur(bt) then Exit(True);
+ end;
+begin
+  Recur(Root);
+end;
+
 function HistorySimple(SimpleType: IXMLSimpleTypeDef): TSimpleHistory;
  var
   BaseSimpleType: TArray<IXMLSimpleTypeDef>;
@@ -470,5 +767,16 @@ begin
     end
   else Result := ct.BaseType;
 end;
+{$ENDREGION}
+
+initialization
+
+RegisterCheckBuildInType(xsdDouble, CheckFloat);
+RegisterCheckBuildInType(xsdFloat, CheckFloat);
+for var d in XSDTypeDecimal do RegisterCheckBuildInType(baseXSDstring[d], CheckInt);
+RegisterCheckBuildInType(xsdAnyUri, CheckAnyURI);
+
+
+finalization
 
 end.

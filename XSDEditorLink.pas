@@ -21,6 +21,8 @@ type
   protected
     procedure CreatePickStringEditor(); override;
     procedure CreateRegExEditor(); override;
+    function ValidateNewData(var Value: Variant): Boolean; override;
+    procedure DoCheckValidateNewDataError(); override;
   private
    procedure OnRegexChange(Sender: TObject);
   end;
@@ -33,26 +35,27 @@ end;
 function GetEditorType(SimpleTypeElement: IXMLTypedSchemaItem): TEditType;
  var
   Res: TEditType;
+  h: THistory;
+  abt: TArray<baseXSD>;
 begin
   Res := etString;
-  var h := HistoryHasValue(SimpleTypeElement.DataType);
+  h := HistoryHasValue(SimpleTypeElement.DataType);
+
+  abt := GetBuildInTypes(h.BaseSimple);
+
+  if abt[0] in XSDTypeDecimal then Res := etNumber
+  else if abt[0] in XSDTimeData then Res := etDate
+  else if abt[0] = btBoolean then Res := etBoolean
+  else if abt[0] in [btFloat, btDouble] then Res := etNumber;
+
   WolkHistorySimple(h.BaseSimple, function (st: IXMLSimpleTypeDef): Boolean
-    function Find( et: TEditType): Boolean;
-    begin
-      Result := True;
-      Res := et;
-    end;
   begin
-    Result := False;
-    if st.Enumerations.Count>0 then Exit(Find(etPickString));
-   // if not VarIsNull(st.Pattern) then Res := etRegexEdit;
-    if st.IsBuiltInType then
+    if st.Enumerations.Count>0 then
      begin
-      if Res <> etString then Exit(True);
-      if (st.Name = 'double') or
-          (st.Name = 'int')
-      then Exit(Find(etNumber))
-     end;
+      Result := True;
+      Res := etPickString;
+     end
+    else Result := False;
   end);
   Result := Res;
 end;
@@ -76,12 +79,16 @@ begin
   begin
     Visible := False;
     Parent := FTree;
-//    EditMask := dt.Pattern;
     OnChange := OnRegexChange;
     Text := nd.Columns[FColumn].Value;
     OnKeyDown := EditKeyDown;
     OnKeyUp := EditKeyUp;
   end;
+end;
+
+procedure TXSDEditLink.DoCheckValidateNewDataError;
+begin
+  if GetValidateError.ErrorString <>'' then raise Exception.Create(GetValidateError.ErrorString);
 end;
 
 procedure TXSDEditLink.OnRegexChange(Sender: TObject);
@@ -95,6 +102,23 @@ begin
   dt := (nd.node as IXMLTypedSchemaItem).DataType;
   if not TRegEx.Match(e.Text, VarToStr(dt.Pattern)).Success then  e.Font.Color := Tcolors.Red
   else e.Font.Color := Tcolors.Black;
+end;
+
+function TXSDEditLink.ValidateNewData(var Value: Variant): Boolean;
+begin
+  if (FColumn = COLL_VAL) then
+   begin
+    var nd := PNodeExData(FNode.GetData);
+    var s := VarToStr(Value).Trim;
+    if s = '' then
+     begin
+      Value := '';
+      nd.Columns[COLL_VAL].Dirty := False;
+      Result := not nd.MastExists
+     end
+    else Result := ValidateData(PNodeExData(FNode.GetData).tip, Value)
+   end
+  else Result := inherited;
 end;
 
 procedure TXSDEditLink.CreatePickStringEditor;
