@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VirtualTrees,  System.IOUtils, System.UITypes, Xml.xmldom,
-  XmlSchema, Xml.XMLIntf, Xml.XMLDoc, Vcl.StdCtrls, tools, System.ImageList, Vcl.ImgList,
+  XmlSchema, Xml.XMLIntf, Xml.XMLDoc, Vcl.StdCtrls, System.ImageList, Vcl.ImgList,
   TreeEditor, math, xsdtools, Xml.XMLSchemaTags, Vcl.Menus;
 
 const
@@ -107,7 +107,8 @@ var
    FormXSD: TFormXSD;
 
 const
-   WITS_DIR = 'C:\Projects\C#\witsml\ext\devkit-c\doc\Standards\energyml\data\witsml\v2.0\xsd_schemas\';
+//   WITS_DIR = 'C:\Projects\C#\witsml\ext\devkit-c\doc\Standards\energyml\data\witsml\v2.0\xsd_schemas\';
+   WITS_DIR = 'd:\Projects\C#\witsml-studio\ext\witsml\ext\devkit-c\doc\Standards\energyml\data\witsml\v2.0\xsd_schemas\';
    WELBORE ='Wellbore.xsd';
    LOG ='log.xsd';
    TUB ='Tubular.xsd';
