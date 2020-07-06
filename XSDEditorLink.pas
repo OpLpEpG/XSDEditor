@@ -2,10 +2,22 @@ unit XSDEditorLink;
 
 interface
 
-uses SysUtils, XmlSchema, Vcl.StdCtrls, System.Variants, Mask, System.RegularExpressions, System.UITypes,
+uses SysUtils, XmlSchema, Vcl.StdCtrls, System.Variants, Mask, System.RegularExpressions, System.UITypes, Types,
      VirtualTrees,
      xsdtools, TreeEditor;
 
+type
+  TXSDEditLink = class(TTreeEditLink)
+  protected
+    procedure CreatePickStringEditor(); override;
+    procedure CreateRegExEditor(); override;
+    procedure SetBounds(R: TRect); override; stdcall;
+    function ValidateNewData(var Value: Variant): Boolean; override;
+    procedure DoCheckValidateNewDataError(); override;
+  private
+   FPattern: string;
+   procedure OnRegexChange(Sender: TObject);
+  end;
 
 procedure GetIVTEditLink(out VTEditLink: IVTEditLink);
 function GetEditorType(SimpleTypeElement: IXMLTypedSchemaItem): TEditType;
@@ -15,17 +27,6 @@ function GetEditorUnionType(e: IXMLTypedSchemaItem): TArray<TEditType>;
 implementation
 
 uses XSDEditor;
-
-type
-  TXSDEditLink = class(TTreeEditLink)
-  protected
-    procedure CreatePickStringEditor(); override;
-    procedure CreateRegExEditor(); override;
-    function ValidateNewData(var Value: Variant): Boolean; override;
-    procedure DoCheckValidateNewDataError(); override;
-  private
-   procedure OnRegexChange(Sender: TObject);
-  end;
 
 procedure GetIVTEditLink(out VTEditLink: IVTEditLink);
 begin
@@ -43,13 +44,18 @@ begin
 
   abt := GetBuildInTypes(h.BaseSimple);
 
-  if abt[0] in XSDTypeDecimal then Res := etNumber
+  if h.BaseSimple.SimpleType.Name = 'String2000' then Res := etMemo
+
+  else if abt[0] in XSDTypeDecimal then Res := etNumber
   else if abt[0] in XSDTimeData then Res := etDate
   else if abt[0] = btBoolean then Res := etBoolean
-  else if abt[0] in [btFloat, btDouble] then Res := etNumber;
+  else if abt[0] in [btFloat, btDouble] then Res := etFloat;
 
+  var pattern := '';
   WolkHistorySimple(h.BaseSimple, function (st: IXMLSimpleTypeDef): Boolean
   begin
+    if not VarIsNull(st.Pattern) then pattern := st.Pattern;
+
     if st.Enumerations.Count>0 then
      begin
       Result := True;
@@ -57,7 +63,8 @@ begin
      end
     else Result := False;
   end);
-  Result := Res;
+  if (Res = etString) and (pattern <> '') then Result := etRegexEdit
+  else Result := Res;
 end;
 
 function GetEditorUnionType(e: IXMLTypedSchemaItem): TArray<TEditType>;
@@ -74,6 +81,11 @@ procedure TXSDEditLink.CreateRegExEditor;
 begin
   nd := FNode.GetData;
   dt := (nd.node as IXMLTypedSchemaItem).DataType;
+  WolkHistorySimple(HistoryHasValue(dt).BaseSimple, function (st: IXMLSimpleTypeDef): Boolean
+  begin
+    if not VarIsNull(st.Pattern) then FPattern := st.Pattern;
+    Result := False;
+  end);
   FEdit := TEdit.Create(nil);
   with FEdit as TEdit do
   begin
@@ -88,7 +100,7 @@ end;
 
 procedure TXSDEditLink.DoCheckValidateNewDataError;
 begin
-  if GetValidateError.ErrorString <>'' then raise Exception.Create(GetValidateError.ErrorString);
+//  if GetValidateError.ErrorString <>'' then raise Exception.Create(GetValidateError.ErrorString);
 end;
 
 procedure TXSDEditLink.OnRegexChange(Sender: TObject);
@@ -100,8 +112,21 @@ begin
   e := FEdit as TEdit;
   nd := FNode.GetData;
   dt := (nd.node as IXMLTypedSchemaItem).DataType;
-  if not TRegEx.Match(e.Text, VarToStr(dt.Pattern)).Success then  e.Font.Color := Tcolors.Red
+  if not TRegEx.Match(e.Text, FPattern).Success then  e.Font.Color := Tcolors.Red
   else e.Font.Color := Tcolors.Black;
+end;
+
+procedure TXSDEditLink.SetBounds(R: TRect);
+var
+  Dummy: Integer;
+begin
+  inherited;
+  if FEdit is TMemo then
+   begin
+    FTree.Header.Columns.GetColumnBounds(COLL_TYPE, Dummy, R.Right);
+    R.Height := R.Height*4;
+    FEdit.BoundsRect := R;
+   end;
 end;
 
 function TXSDEditLink.ValidateNewData(var Value: Variant): Boolean;
@@ -110,7 +135,7 @@ begin
    begin
     var nd := PNodeExData(FNode.GetData);
     var s := VarToStr(Value).Trim;
-    if s = '' then
+    if (s = '') or (s = '0') or (s = '0.00') or (s = '0.0') or (s = '0.000') then
      begin
       Value := '';
       nd.Columns[COLL_VAL].Dirty := False;
@@ -120,6 +145,7 @@ begin
    end
   else Result := inherited;
 end;
+
 
 procedure TXSDEditLink.CreatePickStringEditor;
  var

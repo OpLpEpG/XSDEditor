@@ -44,6 +44,11 @@ type
     function IsAbstract: boolean;
   end;
 
+//  MyTree = class(TVirtualStringTree)
+//  protected
+//    function GetHintWindowClass: THintWindowClass; override;
+//  end;
+
   TFormXSD = class(TForm)
     Tree: TVirtualStringTree;
     TreeImages: TImageList;
@@ -121,7 +126,7 @@ const
 
 implementation
 
-uses XSDEditorLink;
+uses XSDEditorLink, XSDEditorHint;
 
 {$R *.dfm}
 
@@ -420,6 +425,7 @@ end;
 procedure TFormXSD.FormCreate(Sender: TObject);
 begin
 //  ShowAnnotation := True;
+  Screen.HintFont.Size := 8;
   ParentTypeAnnotation := True;
 //  AutoGenerateRepeatedElement := True;
   IgnoreAnnotations := ['AbstractString', 'TypeEnum'];
@@ -953,5 +959,7 @@ begin
      if nd.nt = ntElemRoot then TargetCanvas.Font.Color := clBlue;
    end;
 end;
+
+initialization
 
 end.

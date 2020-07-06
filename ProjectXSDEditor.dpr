@@ -5,7 +5,8 @@ uses
   XSDEditor in 'XSDEditor.pas' {FormXSD},
   TreeEditor in 'TreeEditor.pas',
   xsdtools in 'xsdtools.pas',
-  XSDEditorLink in 'XSDEditorLink.pas';
+  XSDEditorLink in 'XSDEditorLink.pas',
+  XSDEditorHint in 'XSDEditorHint.pas';
 
 {$R *.res}
 

@@ -8,8 +8,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, VirtualTrees, ExtDlgs, ImgList, Buttons, ExtCtrls, ComCtrls,
-  Mask;
-//, Xml.XMLSchemaTags, XmlSchema;
+  Mask, JvSpin;
 
 type
   // Describes the type of value a property tree node stores in its data property.
@@ -19,6 +18,7 @@ type
     etPickString,
     etRegexEdit,
     etNumber,
+    etFloat,
     etBoolean,
     etMemo,
     etDate,
@@ -30,7 +30,7 @@ type
   PColumnData = ^TColumnData;
   TColumnData = record
     EditType: TEditType;
-    Value: variant;
+    Value: Variant;
     Dirty: Boolean;
     Valid: Boolean;
   end;
@@ -42,12 +42,20 @@ type
 
   PEditDataHistory = ^TEditDataHistory;
   TEditDataHistory = record
-    FNode: PVirtualNode;       // The node being edited.
-    FColumn: Integer;          // The column of the node being edited.
-    Value: variant;
+    Node: PVirtualNode;       // The node being edited.
+    Column: Integer;          // The column of the node being edited.
+    Value: Variant;
     Dirty: Boolean;
+    Valid: Boolean;
   end;
 
+  TCreateEditor = procedure of object;
+  TEndEditor = function: string of object;
+  TEditorFunction = record
+    EditType: TEditType;
+    CreateEditor: TCreateEditor;
+    EndEditor: TEndEditor;
+  end;
   // Our own edit link to implement several different node editors.
   TTreeEditLink = class(TInterfacedObject, IVTEditLink)
   protected
@@ -55,6 +63,7 @@ type
     FTree: TVirtualStringTree; // A back reference to the tree calling.
     FNode: PVirtualNode;       // The node being edited.
     FColumn: Integer;          // The column of the node being edited.
+    FEditorFunction:TArray<TEditorFunction>;
     procedure EditKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure EditKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
     function BeginEdit: Boolean; stdcall;
@@ -63,18 +72,30 @@ type
     function GetBounds: TRect; stdcall;
     function PrepareEdit(Tree: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex): Boolean; stdcall;
     procedure ProcessMessage(var Message: TMessage); stdcall;
-    procedure SetBounds(R: TRect); stdcall;
+    procedure SetBounds(R: TRect); virtual; stdcall;
     function ValidateNewData(var Value: Variant): Boolean; virtual;
     procedure CreateMemoEditor(); virtual;
+    function  EndMemoEditor(): string; virtual;
     procedure CreateNumberEditor(); virtual;
+    function  EndNumberEditor(): string; virtual;
+    procedure CreateFloatEditor(); virtual;
+    function  EndFloatEditor(): string; virtual;
     procedure CreateStringEditor(); virtual;
+    function  EndStringEditor(): string; virtual;
     procedure CreatePickStringEditor(); virtual;
+    function  EndPickStringEditor(): string; virtual;
     procedure CreateRegExEditor(); virtual;
+    function  EndRegExEditor(): string; virtual;
     procedure CreateBooleanEditor(); virtual;
+    function  EndBooleanEditor(): string; virtual;
     procedure CreateDateTimeEditor(); virtual;
+    function  EndDateTimeEditor(): string; virtual;
     procedure CreateUnionEditor(); virtual;
+    function  EndUnionEditor(): string; virtual;
     procedure DoCheckValidateNewDataError(); virtual;
   public
+    procedure RegisterEditor(EditType: TEditType; CreateEditor: TCreateEditor; EndEditor: TEndEditor);
+    constructor Create;
     destructor Destroy; override;
   end;
 
@@ -182,40 +203,79 @@ begin
   Result := True;
 
   Data := FNode.GetData();
-  if FEdit is TComboBox then
-    S := TComboBox(FEdit).Text
-  else if FEdit is TDateTimePicker then
-   begin
-    if TDateTimePicker(FEdit).Date = 0 then S := ''
-    else S := DateToStr(TDateTimePicker(FEdit).Date);
-   end
-  else
-   begin
-    GetWindowText(FEdit.Handle, Buffer, 1024);
-    S := Buffer;
-   end;
+  for var x in FEditorFunction do
+   if Data.Columns[FColumn].EditType = x.EditType then
+    begin
+     S := x.EndEditor();
+     Break;
+    end;
   s := s.Trim;
   if not SameStr(S, Data.Columns[FColumn].Value) then
    begin
     V := S;
     Data.Columns[FColumn].Dirty := True;
-    Result := ValidateNewData(V);
-    Data.Columns[FColumn].Valid := Result;
+    Data.Columns[FColumn].Valid := ValidateNewData(V);
     Data.Columns[FColumn].Value := V;
     FTree.InvalidateNode(FNode);
    end;
   FEdit.Hide;
   FTree.SetFocus;
-  if not Result then DoCheckValidateNewDataError();
+  DoCheckValidateNewDataError();
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+function TTreeEditLink.EndBooleanEditor: string;
+begin
+  Result := EndStringEditor;
+end;
+
+function TTreeEditLink.EndDateTimeEditor: string;
+begin
+  if TDateTimePicker(FEdit).Date = 0 then Result := ''
+  else Result := DateToStr(TDateTimePicker(FEdit).Date);
+end;
+
+function TTreeEditLink.EndFloatEditor: string;
+begin
+  Result := (FEdit as TJvSpinEdit).Text;
+end;
+
+function TTreeEditLink.EndMemoEditor: string;
+begin
+  Result := EndStringEditor;
+end;
+
+function TTreeEditLink.EndNumberEditor: string;
+begin
+  Result := (FEdit as TJvSpinEdit).Text;
+end;
+
+function TTreeEditLink.EndPickStringEditor: string;
+begin
+  Result := TComboBox(FEdit).Text;
+end;
+
+function TTreeEditLink.EndRegExEditor: string;
+begin
+  Result := EndStringEditor;
+end;
+
+function TTreeEditLink.EndStringEditor: string;
+var
+  Buffer: array[0..1024] of Char;
+begin
+  GetWindowText(FEdit.Handle, Buffer, 1024);
+  Result := Buffer;
+end;
+
+function TTreeEditLink.EndUnionEditor: string;
+begin
+  Result := EndStringEditor;
+end;
 
 function TTreeEditLink.GetBounds: TRect;
 begin
   Result := FEdit.BoundsRect;
 end;
-
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TTreeEditLink.CreateStringEditor;
@@ -229,6 +289,19 @@ begin
     OnKeyDown := EditKeyDown;
     OnKeyUp := EditKeyUp;
   end;
+end;
+
+constructor TTreeEditLink.Create;
+begin
+  RegisterEditor(etString, CreateStringEditor, EndStringEditor);
+  RegisterEditor(etPickString, CreatePickStringEditor, EndPickStringEditor);
+  RegisterEditor(etRegexEdit, CreateRegexEditor, EndRegexEditor);
+  RegisterEditor(etNumber, CreateNumberEditor, EndNumberEditor);
+  RegisterEditor(etFloat, CreateFloatEditor, EndFloatEditor);
+  RegisterEditor(etBoolean, CreateBooleanEditor, EndBooleanEditor);
+  RegisterEditor(etMemo, CreateMemoEditor, EndMemoEditor);
+  RegisterEditor(etDate, CreateDateTimeEditor, EndDateTimeEditor);
+  RegisterEditor(etUnion, CreateUnionEditor, EndUnionEditor);
 end;
 
 procedure TTreeEditLink.CreateBooleanEditor();
@@ -268,6 +341,21 @@ begin
   end;
 end;
 
+procedure TTreeEditLink.CreateFloatEditor;
+begin
+  FEdit := TJvSpinEdit.Create(nil);
+  with FEdit as TJvSpinEdit do
+   begin
+    ValueType := vtFloat;
+    Decimal := 3;
+    Visible := False;
+    Parent := FTree;
+    Text := PStdData(FNode.GetData).Columns[FColumn].Value;
+    OnKeyDown := EditKeyDown;
+    OnKeyUp := EditKeyUp;
+   end;
+end;
+
 procedure TTreeEditLink.CreateUnionEditor;
 begin
   CreateStringEditor();
@@ -280,12 +368,30 @@ end;
 
 procedure TTreeEditLink.CreateMemoEditor;
 begin
-  CreateStringEditor();
+  FEdit := TMemo.Create(nil);
+  with FEdit as TMemo do
+  begin
+    Visible := False;
+    Parent := FTree;
+    ScrollBars := ssVertical;
+    Text := PStdData(FNode.GetData).Columns[FColumn].Value;
+    OnKeyDown := EditKeyDown;
+    OnKeyUp := EditKeyUp;
+  end;
 end;
 
 procedure TTreeEditLink.CreateNumberEditor;
 begin
-  CreateStringEditor();
+  FEdit := TJvSpinEdit.Create(nil);
+  with FEdit as TJvSpinEdit do
+  begin
+    ValueType := vtInteger;
+    Visible := False;
+    Parent := FTree;
+    Text := PStdData(FNode.GetData).Columns[FColumn].Value;
+    OnKeyDown := EditKeyDown;
+    OnKeyUp := EditKeyUp;
+  end;
 end;
 
 procedure TTreeEditLink.CreatePickStringEditor;
@@ -304,18 +410,12 @@ begin
   // determine what edit type actually is needed
   if Assigned(FEdit) then FreeAndNil(FEdit);
   Data := Node.GetData();
-  case Data.Columns[FColumn].EditType of
-    etString: CreateStringEditor();
-    etPickString: CreatePickStringEditor();
-    etRegexEdit: CreateRegExEditor();
-    etNumber: CreateNumberEditor();
-    etBoolean: CreateBooleanEditor();
-    etMemo: CreateMemoEditor();
-    etDate: CreateDateTimeEditor;
-    etUnion: CreateUnionEditor;
-  else
-    Result := False;
-  end;
+  for var x in FEditorFunction do
+   if Data.Columns[FColumn].EditType = x.EditType then
+    begin
+     x.CreateEditor();
+     Exit;
+    end;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -323,6 +423,23 @@ end;
 procedure TTreeEditLink.ProcessMessage(var Message: TMessage);
 begin
   FEdit.WindowProc(Message);
+end;
+
+procedure TTreeEditLink.RegisterEditor(EditType: TEditType;  CreateEditor: TCreateEditor; EndEditor: TEndEditor);
+ var
+  d: TEditorFunction;
+begin
+  for var i := 0 to High(FEditorFunction) do
+   if FEditorFunction[i].EditType = EditType then
+    begin
+     FEditorFunction[i].CreateEditor := CreateEditor;
+     FEditorFunction[i].EndEditor := EndEditor;
+     Exit;
+    end;
+  d.EditType := EditType;
+  d.CreateEditor := CreateEditor;
+  d.EndEditor := EndEditor;
+  FEditorFunction := FEditorFunction + [d];
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -333,7 +450,11 @@ var
 begin
   // Since we don't want to activate grid extensions in the tree (this would influence how the selection is drawn)
   // we have to set the edit's width explicitly to the width of the column.
+
   FTree.Header.Columns.GetColumnBounds(FColumn, Dummy, R.Right);
+
+  if FEdit is TMemo then R.Height := R.Height * 4;
+
   FEdit.BoundsRect := R;
 end;
 
