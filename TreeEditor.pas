@@ -95,7 +95,7 @@ type
     procedure DoCheckValidateNewDataError(); virtual;
   public
     procedure RegisterEditor(EditType: TEditType; CreateEditor: TCreateEditor; EndEditor: TEndEditor);
-    constructor Create;
+    procedure AfterConstruction; override;
     destructor Destroy; override;
   end;
 
@@ -175,6 +175,20 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
+
+procedure TTreeEditLink.AfterConstruction;
+begin
+  inherited;
+  RegisterEditor(etString, CreateStringEditor, EndStringEditor);
+  RegisterEditor(etPickString, CreatePickStringEditor, EndPickStringEditor);
+  RegisterEditor(etRegexEdit, CreateRegexEditor, EndRegexEditor);
+  RegisterEditor(etNumber, CreateNumberEditor, EndNumberEditor);
+  RegisterEditor(etFloat, CreateFloatEditor, EndFloatEditor);
+  RegisterEditor(etBoolean, CreateBooleanEditor, EndBooleanEditor);
+  RegisterEditor(etMemo, CreateMemoEditor, EndMemoEditor);
+  RegisterEditor(etDate, CreateDateTimeEditor, EndDateTimeEditor);
+  RegisterEditor(etUnion, CreateUnionEditor, EndUnionEditor);
+end;
 
 function TTreeEditLink.BeginEdit: Boolean;
 begin
@@ -291,18 +305,6 @@ begin
   end;
 end;
 
-constructor TTreeEditLink.Create;
-begin
-  RegisterEditor(etString, CreateStringEditor, EndStringEditor);
-  RegisterEditor(etPickString, CreatePickStringEditor, EndPickStringEditor);
-  RegisterEditor(etRegexEdit, CreateRegexEditor, EndRegexEditor);
-  RegisterEditor(etNumber, CreateNumberEditor, EndNumberEditor);
-  RegisterEditor(etFloat, CreateFloatEditor, EndFloatEditor);
-  RegisterEditor(etBoolean, CreateBooleanEditor, EndBooleanEditor);
-  RegisterEditor(etMemo, CreateMemoEditor, EndMemoEditor);
-  RegisterEditor(etDate, CreateDateTimeEditor, EndDateTimeEditor);
-  RegisterEditor(etUnion, CreateUnionEditor, EndUnionEditor);
-end;
 
 procedure TTreeEditLink.CreateBooleanEditor();
 begin

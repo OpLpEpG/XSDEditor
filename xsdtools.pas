@@ -659,7 +659,7 @@ begin
      if  Eg.Ref.HasAnnotation then
        Result := Eg.Ref.Name +': '+ GetDocumentation(Eg.Ref)+ #$D+#$A+' '+ #$D+#$A+' ';
     end;
-   Result := Result.Trim();
+   Result := TRegEx.Replace(Result, '\s+', ' ').Trim;
 end;
 
 function GetUnionSimpleTypes(u: IXMLSimpleTypeUnion): TArray<IXMLSimpleTypeDef>;

@@ -6,7 +6,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VirtualTrees,  System.IOUtils, System.UITypes, Xml.xmldom,
   XmlSchema, Xml.XMLIntf, Xml.XMLDoc, Vcl.StdCtrls, System.ImageList, Vcl.ImgList,
-  TreeEditor, math, xsdtools, Xml.XMLSchemaTags, Vcl.Menus;
+  TreeEditor, math, xsdtools, Xml.XMLSchemaTags, Vcl.Menus, Vcl.ComCtrls;
 
 const
   // Helper message to decouple node change handling from edit handling.
@@ -44,11 +44,6 @@ type
     function IsAbstract: boolean;
   end;
 
-//  MyTree = class(TVirtualStringTree)
-//  protected
-//    function GetHintWindowClass: THintWindowClass; override;
-//  end;
-
   TFormXSD = class(TForm)
     Tree: TVirtualStringTree;
     TreeImages: TImageList;
@@ -72,6 +67,7 @@ type
     procedure TreeGetPopupMenu(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; const P: TPoint;     var AskParent: Boolean; var PopupMenu: TPopupMenu);
     procedure DeleteClick(Sender: TObject);
     procedure TreeEdited(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex);
+    procedure ButtonedEdit1Click(Sender: TObject);
   private
     { Private declarations }
     procedure AddAnnotation(Node: PVirtualNode; e: IXMLAnnotatedItem);
@@ -112,14 +108,16 @@ var
    FormXSD: TFormXSD;
 
 const
-//   WITS_DIR = 'C:\Projects\C#\witsml\ext\devkit-c\doc\Standards\energyml\data\witsml\v2.0\xsd_schemas\';
-   WITS_DIR = 'd:\Projects\C#\witsml-studio\ext\witsml\ext\devkit-c\doc\Standards\energyml\data\witsml\v2.0\xsd_schemas\';
+   WITS_DIR = 'C:\Projects\C#\witsml\ext\devkit-c\doc\Standards\energyml\data\witsml\v2.0\xsd_schemas\';
+//   WITS_DIR = 'd:\Projects\C#\witsml-studio\ext\witsml\ext\devkit-c\doc\Standards\energyml\data\witsml\v2.0\xsd_schemas\';
    WELBORE ='Wellbore.xsd';
    LOG ='log.xsd';
    TUB ='Tubular.xsd';
    JOB ='StimJob.xsd';
    WELL ='Well.xsd';
+   TEER ='ToolErrorModel.xsd';
    SP ='SurveyProgram.xsd';
+   DR ='DrillReport.xsd';
    WG ='WellboreGeometry.xsd';
    WELLC ='WellboreCompletion.xsd';
    WELLB ='WellBore.xsd';
@@ -285,7 +283,7 @@ begin
   Columns[COLL_VAL].Value := '';
   if TypeHasValue(nodeType) then
    begin
-    Columns[COLL_VAL].EditType := GetEditorType(Result);
+    Columns[COLL_VAL].EditType := GlobalXSDEditLinkClass.GetEditorType(Result);
     columns[COLL_UOM].Value := TEST_GetSimple(nodeType);
    end
   else
@@ -316,7 +314,7 @@ begin
    begin
     n.nt := ntElemEditable;
     PatchAnnotatedEnumeration(e.DataType);
-    n.Columns[COLL_VAL].EditType := GetEditorType(e);
+    n.Columns[COLL_VAL].EditType := GlobalXSDEditLinkClass.GetEditorType(e);
     if e.DataType.IsComplex then
      begin
       var ct := e.DataType as IXMLComplexTypeDef;
@@ -345,7 +343,7 @@ begin
   PatchAnnotatedEnumeration(e.DataType);
   n.columns[COLL_TREE].Value := e.Name;
   n.columns[COLL_TYPE].Value := e.DataTypeName;
-  n.Columns[COLL_VAL].EditType := GetEditorType(e);
+  n.Columns[COLL_VAL].EditType := GlobalXSDEditLinkClass.GetEditorType(e);
   if n.MastExists then n.Columns[COLL_VAL].Valid := False;
   n.columns[COLL_UOM].Value := TEST_GetSimple(e.DataType);
 end;
@@ -426,11 +424,12 @@ procedure TFormXSD.FormCreate(Sender: TObject);
 begin
 //  ShowAnnotation := True;
   Screen.HintFont.Size := 8;
-  ParentTypeAnnotation := True;
+  ParentTypeAnnotation := False;
 //  AutoGenerateRepeatedElement := True;
   IgnoreAnnotations := ['AbstractString', 'TypeEnum'];
   TDirectory.SetCurrentDirectory(WITS_DIR);
   doc := LoadXMLSchema(WELL);
+//  doc := LoadXMLSchema(SP);
 //  doc := LoadXMLSchema(LOG);
 //  doc := LoadXMLSchema(TUB);
 //  doc := LoadXMLSchema(JOB);
@@ -615,6 +614,11 @@ begin
   AddAnnotation(Result, e);
 
   AddComplexHistory(Result);
+end;
+
+procedure TFormXSD.ButtonedEdit1Click(Sender: TObject);
+begin
+    //
 end;
 
 procedure TFormXSD.AddElem(Node: PVirtualNode; e: IXMLElementDef);
