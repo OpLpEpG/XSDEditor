@@ -423,10 +423,10 @@ end;
 procedure TFormXSD.FormCreate(Sender: TObject);
 begin
 //  ShowAnnotation := True;
-  Screen.HintFont.Size := 8;
-  ParentTypeAnnotation := False;
+//  Screen.HintFont.Size := 8;
+  ParentTypeAnnotation := True;
 //  AutoGenerateRepeatedElement := True;
-  IgnoreAnnotations := ['AbstractString', 'TypeEnum'];
+  IgnoreAnnotations := ['AbstractString','AbstractObject', 'TypeEnum'];
   TDirectory.SetCurrentDirectory(WITS_DIR);
   doc := LoadXMLSchema(WELL);
 //  doc := LoadXMLSchema(SP);
@@ -438,6 +438,7 @@ begin
 //  TDirectory.SetCurrentDirectory(TPath.GetLibraryPath);
 //  sd.SchemaDoc.SaveToFile('well.xsd');
   TreeUpdate(sd);
+  ConnectXSDTreeHintAdapter(Self);
 end;
 
 procedure TFormXSD.ClearTree;
@@ -749,7 +750,6 @@ begin
   finally
    ss.Free;
   end;
-//
 end;
 
 procedure TFormXSD.TreeGetNodeDataSize(Sender: TBaseVirtualTree; var NodeDataSize: Integer);
@@ -915,9 +915,10 @@ begin
   nd := Tree.GetNodeData(Node);
   if (Column = COLL_TREE) then
    begin
-    if nd.nt in [ntElemRoot, ntGroup] then
+    if (nd.nt in [ntElemRoot, ntGroup]) or ((nd.nt = ntElemEditable) and nd.tip.IsComplex)  then //nd.nt in [ntElemRoot, ntGroup]
       if vsExpanded in Node.States then ImageIndex := 2
       else ImageIndex := 1
+    else if nd.nt = ntAttr then ImageIndex := 27
     else if nd.MastExists then ImageIndex := 5;
    end;
   if (Column = COLL_TYPE) then
@@ -939,7 +940,7 @@ begin
    begin
     TargetCanvas.Font.Style := [fsBold];
     case nd.nt of
-     ntAttr: TargetCanvas.Font.Color := clBlue;
+     ntAttr: if nd.MastExists then TargetCanvas.Font.Color := clBlue;
      ntGroup: TargetCanvas.Font.Color := TColors.Darkgoldenrod;
      ntRepeater:
        if nd.MastExists then TargetCanvas.Font.Color := TColors.Darkred

@@ -148,15 +148,15 @@ const
 
 const
  SCM: array[TContentModel] of string = ('cmALL',  // support As cmSequence
- 'cmChoice',  { TODO : need }
- 'cmSequence', // support
+ 'cmChoice',  // support
+ 'cmSequence', // full support !!!
  'cmGroupRef', // full support !!!
- 'cmEmpty'); // support dmSimpleExtension
+ 'cmEmpty'); // full support !!!
  SCT: array[TCompositorType] of string = ('ctAll', 'ctChoice', 'ctSequence');
  SDM: array[TDerivationMethod] of string = (
  'dmNone', // нет базового типа
  'dmComplexExtension', // наследование от базового типа
- 'dmComplexRestriction', // ????  базового типа
+ 'dmComplexRestriction', // ограничение базового типа (пример: необяз. элэм на обязат.)
  'dmSimpleExtension',  // добавление атрибутов к простому типу базового типа
  'dmSimpleRestriction'); // ограничение + добавление атрибутов к простому типу базового типа
 
@@ -180,7 +180,12 @@ type
    BaseSimple: TSimpleHistory;
  end;
 
-function GetAnnotation(e: IXMLAnnotatedItem; ParentTypeAnnotation: Boolean = False; const IgnoreItems: TArray<string> = []): string;
+function GetAnnotation(e: IXMLAnnotatedItem; ParentTypeAnnotation: Boolean = False;
+                       const IgnoreItems: TArray<string> = [];
+                       const DocDelim: string = #$D+#$A+' '+ #$D+#$A+' '): string;
+function GetAnnotationEx(e: IXMLAnnotatedItem; ParentTypeAnnotation: Boolean = False;
+                         const IgnoreItems: TArray<string> = []): TArray<string>;
+
 function GetUnionSimpleTypes(u: IXMLSimpleTypeUnion): TArray<IXMLSimpleTypeDef>;
 // история наследования типов
 function PatchGetBaseType(Tip: IXMLTypeDef): IXMLTypeDef;
@@ -282,6 +287,8 @@ type
   end;
 
 implementation
+
+uses WinAPI.Windows;
 
 {$REGION 'TXMLSchemaEnumerator<T>'}
 { TXMLSchemaEnumerator<T> }
@@ -427,33 +434,34 @@ const
   E_ENUM = 'error %s Enumeration(%d) not have %s';
 function CheckFacets(st: IXMLSimpleTypeDef; var val: Variant): Boolean;
  var
-  s: string;
+  s, name: string;
 begin
   Result := True;
   s := VarToStr(val);
+  if st.IsAnonymous then name := 'anonimus' else name := st.Name;
   if not VarIsNull(st.Length) then
    begin
     if st.Length <> s.Length then
-       Exit(SetValidateError(st.Name, cherLength, st.Length, s.Length, val,
-                             Format(E_LENGTH,[st.Name, Integer(st.Length), s.Length, Val])));
+       Exit(SetValidateError(name, cherLength, st.Length, s.Length, val,
+                             Format(E_LENGTH,[name, Integer(st.Length), s.Length, Val])));
    end
   else if not VarIsNull(st.MinLength) then
    begin
     if st.MinLength > s.Length then
-       Exit(SetValidateError(st.Name, cherMinLength, st.MinLength, s.Length, val,
-                             Format(E_MINLENGTH,[st.Name, Integer(st.MinLength), s.Length, Val])));
+       Exit(SetValidateError(name, cherMinLength, st.MinLength, s.Length, val,
+                             Format(E_MINLENGTH,[name, Integer(st.MinLength), s.Length, Val])));
    end
   else if not VarIsNull(st.MaxLength) then
    begin
     if st.MaxLength < s.Length then
-        Exit(SetValidateError(st.Name, cherMaxLength, st.MaxLength, s.Length, val,
-                              Format(E_MAXLENGTH,[st.Name, Integer(st.MaxLength), s.Length, Val])));
+        Exit(SetValidateError(name, cherMaxLength, st.MaxLength, s.Length, val,
+                              Format(E_MAXLENGTH,[name, Integer(st.MaxLength), s.Length, Val])));
    end
   else if not VarIsNull(st.Pattern) then
    begin
     if not TRegEx.Match(val, VarToStr(st.Pattern)).Success then
-      Exit(SetValidateError(st.Name, cherPattern, st.Pattern, '', val,
-                            Format(E_PATTERN,[st.Name, st.Pattern, Val])));
+      Exit(SetValidateError(name, cherPattern, st.Pattern, '', val,
+                            Format(E_PATTERN,[name, st.Pattern, Val])));
    end
   else if not VarIsNull(st.Whitespace) then
    begin
@@ -463,32 +471,32 @@ begin
   else if not VarIsNull(st.MaxInclusive) then
    begin
     if st.MaxInclusive <= StrToFloat(VarToStr(val)) then
-      Exit(SetValidateError(st.Name, cherMaxInclusive, st.MaxInclusive, '', val,
-                            Format(E_MAXI,[st.Name, st.MaxInclusive, val])));
+      Exit(SetValidateError(name, cherMaxInclusive, st.MaxInclusive, '', val,
+                            Format(E_MAXI,[name, st.MaxInclusive, val])));
    end
   else if not VarIsNull(st.MaxExclusive) then
    begin
     if st.MaxExclusive < StrToFloat(VarToStr(val)) then
-      Exit(SetValidateError(st.Name, cherMaxExclusive, st.MaxExclusive, '', val,
-                            Format(E_MAXE,[st.Name, st.MaxExclusive, val])));
+      Exit(SetValidateError(name, cherMaxExclusive, st.MaxExclusive, '', val,
+                            Format(E_MAXE,[name, st.MaxExclusive, val])));
    end
   else if not VarIsNull(st.MinInclusive) then
    begin
     if st.MinInclusive >= StrToFloat(VarToStr(val)) then
-      Exit(SetValidateError(st.Name, cherMinInclusive, st.MinInclusive, '', val,
-                            Format(E_MINI,[st.Name, st.MinInclusive, val])));
+      Exit(SetValidateError(name, cherMinInclusive, st.MinInclusive, '', val,
+                            Format(E_MINI,[name, st.MinInclusive, val])));
    end
   else if not VarIsNull(st.MinExclusive) then
    begin
     if st.MinExclusive > StrToFloat(VarToStr(val)) then
-      Exit(SetValidateError(st.Name, cherMinExclusive, st.MinExclusive, '', val,
-                            Format(E_MINE,[st.Name, st.MinExclusive, val])));
+      Exit(SetValidateError(name, cherMinExclusive, st.MinExclusive, '', val,
+                            Format(E_MINE,[name, st.MinExclusive, val])));
    end
   else if st.Enumerations.Count > 0 then
    begin
     for var e in TXSEnum<IXMLEnumeration>.XEnum(st.Enumerations) do if SameStr(e.Value, val) then Exit;
-    Exit(SetValidateError(st.Name, cherEnumeration, st.Enumerations.Count, '', val,
-                          Format(E_ENUM,[st.Name, st.Enumerations.Count, val])));
+    Exit(SetValidateError(name, cherEnumeration, st.Enumerations.Count, '', val,
+                          Format(E_ENUM,[name, st.Enumerations.Count, val])));
    end
   else if not VarIsNull(st.TotalDigits) then
      begin
@@ -506,12 +514,26 @@ begin
   if not CheckFacets(st, val) then Exit(False);
 end;
 
+procedure LogPr(const DebugMessage: string);
+begin
+  OutputDebugString(PChar(DebugMessage));
+end;
+
 function ValidateData(data: IXMLTypeDef; var Value: Variant): Boolean;
   function Check(item: TSimpleHistory): boolean;
   begin
     Result := True;
-    if not CheckSimpleData(item.SimpleType, Value) then Exit(False);
-    for var t in item.BaseArray do if not Check(t) then Exit(False);
+    if item.SimpleType.DerivationMethod = sdmUnion then
+     begin
+      for var t in item.BaseArray do if Check(t) then Exit;
+//      LogPr('not check union ' + item.SimpleType.Name);
+      Result := False;
+     end
+    else
+     begin
+      if not CheckSimpleData(item.SimpleType, Value) then Exit(False);
+      for var t in item.BaseArray do if not Check(t) then Exit(False);
+     end;
   end;
 begin
   LastValidateErrorData.ErrorString := '';
@@ -598,7 +620,8 @@ begin
   Result := not (e.IsComplex and ((e as IXMLComplexTypeDef).DerivationMethod in COMPLEX_ROOT_ELEMENT))
 end;
 
-function GetAnnotation(e: IXMLAnnotatedItem; ParentTypeAnnotation: Boolean = False; const IgnoreItems: TArray<string> = []): string;
+function GetAnnotationEx(e: IXMLAnnotatedItem; ParentTypeAnnotation: Boolean = False;
+                       const IgnoreItems: TArray<string> = []): TArray<string>;
  var
   Et : IXMLTypedSchemaItem;
   Eg: IXMLElementGroup;
@@ -640,9 +663,11 @@ function GetAnnotation(e: IXMLAnnotatedItem; ParentTypeAnnotation: Boolean = Fal
     Result := False;
   end;
 begin
-  Result := '';
   if e.HasAnnotation and not IsIgnore(e) then
-    Result := {e.Name +': '+} GetDocumentation(e)+ #$D+#$A+' '+ #$D+#$A+' ';
+   begin
+    Result := [TRegEx.Replace(GetDocumentation(e), '\s+', ' ').Trim]
+   end
+  else Result := [];
 
   if Supports(e, IXMLTypedSchemaItem, et) then
    begin
@@ -650,16 +675,25 @@ begin
     while Assigned(Dt) do
      begin
       if dt.HasAnnotation and not IsIgnore(dt) then
-        Result := Result +Dt.Name+': '+GetDocumentation(dt)+ #$D+#$A+' '+ #$D+#$A+' ';
+        Result := Result + [TRegEx.Replace(Dt.Name+' : '+GetDocumentation(dt), '\s+', ' ').Trim];
       if ParentTypeAnnotation then Dt := Dt.BaseType else Dt := nil;
      end;
    end
    else if Supports(e, IXMLElementGroup, eg) then
     begin
      if  Eg.Ref.HasAnnotation then
-       Result := Eg.Ref.Name +': '+ GetDocumentation(Eg.Ref)+ #$D+#$A+' '+ #$D+#$A+' ';
+       Result := Result + [TRegEx.Replace(Eg.Ref.Name +' : '+ GetDocumentation(Eg.Ref), '\s+', ' ').Trim];
     end;
-   Result := TRegEx.Replace(Result, '\s+', ' ').Trim;
+end;
+
+function GetAnnotation(e: IXMLAnnotatedItem; ParentTypeAnnotation: Boolean = False;
+            const IgnoreItems: TArray<string> = [];
+            const DocDelim: string = #$D+#$A+' '+ #$D+#$A+' '): string;
+begin
+  Result := '';
+  var d := GetAnnotationEx(e, ParentTypeAnnotation, IgnoreItems);
+  for var s in d do Result := Result + s + DocDelim;
+  Result := Result.Trim;
 end;
 
 function GetUnionSimpleTypes(u: IXMLSimpleTypeUnion): TArray<IXMLSimpleTypeDef>;

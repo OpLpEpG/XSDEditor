@@ -2,7 +2,7 @@ unit AnnotatedStringEditor;
 
 interface
 
-uses SysUtils, Vcl.StdCtrls, Winapi.Windows, Winapi.Messages, System.Classes, Vcl.Controls;
+uses SysUtils, Vcl.StdCtrls, Winapi.Windows, Winapi.Messages, System.Classes, Vcl.Controls, Vcl.Graphics;
 
 type
   TPickStringEditor = class(TComboBox)
@@ -27,6 +27,10 @@ implementation
 
 uses math;
 
+const
+  SPASE_ITEM_ANN = 2+16;
+  SPASE_END = 16+8;
+
 { TPickStringEditor }
 
 procedure TPickStringEditor.CloseUp;
@@ -50,8 +54,13 @@ begin
       begin
        //Visual state of the text(items) in the deployed list
         Canvas.TextOut(Rect.Left + 2, Rect.Top, Items[Index]);
-        Canvas.Font.Color := $50E050;
-        Canvas.TextOut(FmaxItemWidth + 2 + 16, Rect.Top, FAnnotations[Index]);
+        if FAnnotations[Index] <> '' then
+         begin
+          var R :=  Rect;
+          R.Left := R.Left+ FmaxItemWidth + SPASE_ITEM_ANN;
+          Canvas.Font.Color := $208020;
+          Canvas.TextRect(R, FAnnotations[Index], [tfEndEllipsis, tfWordBreak]);
+         end;
       end
 end;
 
@@ -60,9 +69,12 @@ procedure TPickStringEditor.MeasureItem(Index: Integer; var Height: Integer);
   nlines, ost: Integer;
 begin
   if Index < 0 then Exit;
-  nlines := (Canvas.TextWidth(FAnnotations[Index]) + FmaxItemWidth) div FWidth;
-  ost := (Canvas.TextWidth(FAnnotations[Index]) + FmaxItemWidth) mod FWidth;
-  if ost > 0  then  Inc(nlines);
+  var annwi := FWidth -FmaxItemWidth - SPASE_ITEM_ANN - SPASE_END;
+  if annwi <= (SPASE_ITEM_ANN + SPASE_END) then Exit;
+  nlines := Canvas.TextWidth(FAnnotations[Index]) div annwi;
+  ost := Canvas.TextWidth(FAnnotations[Index]) mod annwi;
+  if ost > 0 then Inc(nlines);
+  if nlines = 0 then Exit;
   Height := Height * nlines;
 end;
 
@@ -83,6 +95,8 @@ begin
   FmaxItemAnnotWidth := 0;
   for var i := 0 to ItemCount-1 do FmaxItemAnnotWidth := max(FmaxItemAnnotWidth, Canvas.TextWidth(FAnnotations[i]));
   if (FmaxItemWidth + FmaxItemAnnotWidth) < MaxWidth then FWidth := FmaxItemWidth + FmaxItemAnnotWidth;
+  Inc(FWidth, SPASE_ITEM_ANN + SPASE_END);
+  if FWidth < Width then FWidth := Width;
 end;
 
 procedure TPickStringEditor.AddAnnotatedItem(const ItemName, Annotation: string);

@@ -179,7 +179,8 @@ var
 begin
   if FEdit is TMemo then
    begin
-    FTree.Header.Columns.GetColumnBounds(COLL_TYPE, Dummy, R.Right);
+    FTree.Header.Columns.GetColumnBounds(0, Dummy, R.Left);
+    FTree.Header.Columns.GetColumnBounds(COLL_COUNT-1, R.Right, Dummy);
     R.Height := R.Height*4;
     FEdit.BoundsRect := R;
    end
@@ -188,9 +189,10 @@ end;
 
 function TXSDEditLink.ValidateNewData(var Value: Variant): Boolean;
 begin
+  Result := True;
+  var nd := PNodeExData(FNode.GetData);
   if (FColumn = COLL_VAL) then
    begin
-    var nd := PNodeExData(FNode.GetData);
     var s := VarToStr(Value).Trim;
     if (s = '') or (s = '0') or (s = '0.00') or (s = '0.0') or (s = '0.000') then
      begin
@@ -200,9 +202,9 @@ begin
      end
     else Result := ValidateData(PNodeExData(FNode.GetData).tip, Value)
    end
+  else if (FColumn = COLL_TYPE) and (Value =  '') then Value := nd.Columns[COLL_TYPE].Value
   else Result := inherited;
 end;
-
 
 
 procedure TXSDEditLink.CreateDateTimeEditor;
@@ -240,6 +242,11 @@ begin
   Result := pse.Text;
 end;
 
+  function _GetAnn(ann: IXMLSchemaNode): string;
+  begin
+    Result := GetDocumentation(ann as IXMLSchemaItem);
+    Result := TRegEx.Replace(Result, '\s+', ' ').Trim;
+  end;
 procedure TXSDEditLink.CreatePickStringEditor;
  var
   nd: PNodeExData;
@@ -260,7 +267,7 @@ begin
          Result := st.Enumerations.Count > 0;
          if Result then
            for var e in TXSEnum<IXMLEnumeration>.XEnum(st.Enumerations) do
-               AddAnnotatedItem(e.Value, GetDocumentation(e as IXMLSchemaItem));
+               AddAnnotatedItem(e.Value, _GetAnn(e));
          AdjustWidth(FTree.ClientWidth);
        end);
       end;
@@ -269,14 +276,15 @@ begin
        if nd.nt = ntChoice then
         begin
          for var t in TXSEnum<IXMLElementDef>.XEnum((nd.node as IXMLElementCompositor).ElementDefs) do
-             AddAnnotatedItem(t.DataTypeName, GetDocumentation(t));
+             AddAnnotatedItem(t.DataTypeName, _GetAnn(t));
         end
        else if nd.IsBaseAbstract then
         begin
          var a := FindAbstractChilds((nd.node as IXMLElementDef).DataType as IXMLComplexTypeDef);
-         for var t in a do AddAnnotatedItem(t.Name, GetDocumentation(t));
+         if Length(a) = 0 then AddAnnotatedItem(text, _GetAnn((nd.node as IXMLElementDef).DataType))
+         else for var t in a do AddAnnotatedItem(t.Name, _GetAnn(t));
         end;
-         AdjustWidth(FTree.ClientWidth);
+       AdjustWidth(FTree.ClientWidth);
       end;
     end;
     OnKeyDown := EditKeyDown;
