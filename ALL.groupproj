@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{A97F8B1E-3463-49AE-A822-EDFFF4BC503D}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="ProjectXSDEditor.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="..\CsToPasTest\Test.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="ProjectXSDEditor">
+        <MSBuild Projects="ProjectXSDEditor.dproj"/>
+    </Target>
+    <Target Name="ProjectXSDEditor:Clean">
+        <MSBuild Projects="ProjectXSDEditor.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ProjectXSDEditor:Make">
+        <MSBuild Projects="ProjectXSDEditor.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Test">
+        <MSBuild Projects="..\CsToPasTest\Test.dproj"/>
+    </Target>
+    <Target Name="Test:Clean">
+        <MSBuild Projects="..\CsToPasTest\Test.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Test:Make">
+        <MSBuild Projects="..\CsToPasTest\Test.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="ProjectXSDEditor;Test"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="ProjectXSDEditor:Clean;Test:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="ProjectXSDEditor:Make;Test:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
