@@ -2,7 +2,7 @@ unit XSDEditor;
 
 interface
 
-uses
+uses  Xml.Win.msxmldom, Winapi.MSXMLIntf,
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, VirtualTrees,  System.IOUtils, System.UITypes, Xml.xmldom,
   XmlSchema, Xml.XMLIntf, Xml.XMLDoc, Vcl.StdCtrls, System.ImageList, Vcl.ImgList,
@@ -57,7 +57,6 @@ type
     procedure TreeMeasureItem(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode;var NodeHeight: Integer);
     procedure TreePaintText(Sender: TBaseVirtualTree; const TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType);
     procedure TreeGetImageIndex(Sender: TBaseVirtualTree; Node: PVirtualNode; Kind: TVTImageKind; Column: TColumnIndex; var Ghosted: Boolean; var ImageIndex: TImageIndex);
-    procedure TreeGetHint(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; var LineBreakStyle: TVTTooltipLineBreakStyle; var HintText: string);
     procedure TreeCreateEditor(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; out EditLink: IVTEditLink);
     procedure TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
     procedure TreeFocusChanged(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex);
@@ -92,6 +91,7 @@ type
     function FindRepeaterNode(elem: PVirtualNode): PVirtualNode;
   private
     procedure WMStartEditing(var Message: TMessage); message WM_STARTEDITING;
+//    procedure ValidationCallback(SeverityType: integer; ErrorMessage: PChar); safecall;
   public
     { Public declarations }
     IgnoreAnnotations: TArray<string>;
@@ -100,6 +100,7 @@ type
     AutoGenerateRepeatedElement: Boolean;
     sd: IXMLSchemaDef;
     doc: IXMLSchemaDoc;
+    doc_Exam: IXMLDocument;
     procedure ClearTree;
     procedure TreeUpdate(root: IXMLSchemaDef);
   end;
@@ -108,13 +109,14 @@ var
    FormXSD: TFormXSD;
 
 const
-   WITS_DIR = 'C:\Projects\C#\witsml\ext\devkit-c\doc\Standards\energyml\data\witsml\v2.0\xsd_schemas\';
+   WITS_DIR = 'C:\repositories\witsml\v2.0\xsd_schemas\';
 //   WITS_DIR = 'd:\Projects\C#\witsml-studio\ext\witsml\ext\devkit-c\doc\Standards\energyml\data\witsml\v2.0\xsd_schemas\';
    WELBORE ='Wellbore.xsd';
    LOG ='log.xsd';
    TUB ='Tubular.xsd';
    JOB ='StimJob.xsd';
    WELL ='Well.xsd';
+   WELL_EXAMPL='C:\repositories\witsml\v2.0\xsd_schemas\Well.xml';
    TEER ='ToolErrorModel.xsd';
    SP ='SurveyProgram.xsd';
    DR ='DrillReport.xsd';
@@ -133,7 +135,8 @@ begin
   OutputDebugString(PChar(DebugMessage));
 end;
 
-procedure GetXSDTypeInfo(TypeDef: IXMLTypeDef; ss: TStrings);
+{$REGION 'TTreeData'}
+{procedure GetXSDTypeInfo(TypeDef: IXMLTypeDef; ss: TStrings);
   procedure AddFacet(f: Variant; const name: string);
   begin
     if not VarIsNull(f) then ss.Add(name + '=' + f);
@@ -203,9 +206,9 @@ begin
      end
     else AddSimpleAtomic(TypeDef);
    end;
-end;
+end; }
 
-function TEST_GetSimple(t: IXMLTypeDef): string;
+{function TEST_GetSimple(t: IXMLTypeDef): string;
 begin
   var res := '';
   var h := HistoryHasValue(t);
@@ -237,9 +240,8 @@ begin
     Res := Res + '('+ c.Name + ' ' + at + ' '+ SCM[c.ContentModel] + ' ' + SDM[c.DerivationMethod]+')';
    end;
   Result := Res;
-end;
+end;       }
 
-{$REGION 'TTreeData'}
 { TTreeData }
 
 procedure TTreeData.StdInit(NodeType: TNodeType; SchemaItem: IXMLAnnotatedItem);
@@ -284,12 +286,12 @@ begin
   if TypeHasValue(nodeType) then
    begin
     Columns[COLL_VAL].EditType := GlobalXSDEditLinkClass.GetEditorType(Result);
-    columns[COLL_UOM].Value := TEST_GetSimple(nodeType);
+//    columns[COLL_UOM].Value := TEST_GetSimple(nodeType);
    end
   else
    begin
     var ct := nodeType as IXMLComplexTypeDef;
-    columns[COLL_UOM].Value := TEST_GetComplex(ct);
+//    columns[COLL_UOM].Value := TEST_GetComplex(ct);
    end;
 end;
 
@@ -324,7 +326,7 @@ begin
        end;
      end;
     if n.MastExists then n.Columns[COLL_VAL].Valid := False;
-    n.columns[COLL_UOM].Value := TEST_GetSimple(e.DataType);
+//    n.columns[COLL_UOM].Value := TEST_GetSimple(e.DataType);
    end
   else
    begin
@@ -332,7 +334,7 @@ begin
     n.nt := ntElemRoot;
     if ct.AbstractType then
       n.Columns[COLL_TYPE].EditType := etPickString;
-    n.columns[COLL_UOM].Value := TEST_GetComplex(ct);// SCM[ct.ContentModel]+ ' ' + SDM[ct.DerivationMethod];
+//    n.columns[COLL_UOM].Value := TEST_GetComplex(ct);// SCM[ct.ContentModel]+ ' ' + SDM[ct.DerivationMethod];
    end;
 end;
 
@@ -345,7 +347,7 @@ begin
   n.columns[COLL_TYPE].Value := e.DataTypeName;
   n.Columns[COLL_VAL].EditType := GlobalXSDEditLinkClass.GetEditorType(e);
   if n.MastExists then n.Columns[COLL_VAL].Valid := False;
-  n.columns[COLL_UOM].Value := TEST_GetSimple(e.DataType);
+//  n.columns[COLL_UOM].Value := TEST_GetSimple(e.DataType);
 end;
 
 class procedure TTreeData.ChoiceRepeater(n: PNodeExData; comp: IXMLElementCompositor);
@@ -421,6 +423,12 @@ end;
 {$ENDREGION TTreeData}
 
 procedure TFormXSD.FormCreate(Sender: TObject);
+ var
+  err : IXMLDOMParseError;
+  var
+   y: Integer;
+   s: PAnsiChar;
+   i: Integer;
 begin
 //  ShowAnnotation := True;
 //  Screen.HintFont.Size := 8;
@@ -429,6 +437,7 @@ begin
   IgnoreAnnotations := ['AbstractString','AbstractObject', 'TypeEnum'];
   TDirectory.SetCurrentDirectory(WITS_DIR);
   doc := LoadXMLSchema(WELL);
+//  doc_Exam := LoadXMLDocument(WELL_EXAMPL);
 //  doc := LoadXMLSchema(SP);
 //  doc := LoadXMLSchema(LOG);
 //  doc := LoadXMLSchema(TUB);
@@ -466,6 +475,12 @@ begin
   sd.SchemaDoc.SaveToFile(Fname + '.xsd');
   TDirectory.SetCurrentDirectory(WITS_DIR);
 end;
+
+//procedure TFormXSD.ValidationCallback(SeverityType: integer; ErrorMessage: PChar);
+//begin
+//  if SeverityType = 0 then MessageDlg(ErrorMessage ,mtError, [mbOK], 0)
+//  else MessageDlg(ErrorMessage ,mtWarning, [mbOK], 0)
+//end;
 
 {$REGION 'Load Scemma'}
 procedure TFormXSD.AddAnnotation(Node: PVirtualNode; e: IXMLAnnotatedItem);
@@ -732,25 +747,6 @@ begin
 end;
 
 {$ENDREGION}
-
-procedure TFormXSD.TreeGetHint(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex;
-  var LineBreakStyle: TVTTooltipLineBreakStyle; var HintText: string);
- var
-  nd: PNodeExData;
-  ss: TStrings;
-begin
-  nd := Tree.GetNodeData(Node);
-  if nd.nt > ntAttr then Exit;
-  ss := TStringList.Create;
-  try
-   GetXSDTypeInfo(nd.tip, ss);
-   ss.Text := ss.Text + GetAnnotation(nd.node, true, IgnoreAnnotations);
-   LineBreakStyle := hlbForceMultiLine;
-   HintText := ss.Text;
-  finally
-   ss.Free;
-  end;
-end;
 
 procedure TFormXSD.TreeGetNodeDataSize(Sender: TBaseVirtualTree; var NodeDataSize: Integer);
 begin

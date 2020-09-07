@@ -67,7 +67,6 @@ object FormXSD: TFormXSD
     OnGetText = TreeGetText
     OnPaintText = TreePaintText
     OnGetImageIndex = TreeGetImageIndex
-    OnGetHint = TreeGetHint
     OnGetNodeDataSize = TreeGetNodeDataSize
     OnGetPopupMenu = TreeGetPopupMenu
     OnInitNode = TreeInitNode

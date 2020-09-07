@@ -80,10 +80,10 @@ type
   Form: TFormXSD;
   outText: string;
   typeText: TArray<TAnyStyleLine>;
-//  procedure GetHint(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; var LineBreakStyle: TVTTooltipLineBreakStyle; var HintText: string);
   procedure GetHintSize(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; var R: TRect);
   procedure DrawHint(Sender: TBaseVirtualTree; HintCanvas: TCanvas; Node: PVirtualNode; R: TRect; Column: TColumnIndex);
   procedure GetHintKind(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; var Kind: TVTHintKind);
+  procedure GetHint(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; var LineBreakStyle: TVTTooltipLineBreakStyle; var HintText: string);
 end;
 
 { THintAdapter }
@@ -105,6 +105,12 @@ begin
     s.Paint(HintCanvas, r.Left, top);
     top := top + s.cy;
    end;
+end;
+
+procedure THintAdapter.GetHint(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex;
+  var LineBreakStyle: TVTTooltipLineBreakStyle; var HintText: string);
+begin
+  HintText := ' '
 end;
 
 procedure THintAdapter.GetHintKind(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; var Kind: TVTHintKind);
@@ -265,7 +271,7 @@ begin
   h.Tree.OnGetHintKind := h.GetHintKind;
   h.Tree.OnGetHintSize := h.GetHintSize;
   h.Tree.OnDrawHint := h.DrawHint;
-//  h.Tree.OnGetHint := h.GetHint;
+  h.Tree.OnGetHint := h.GetHint;
 end;
 
 end.

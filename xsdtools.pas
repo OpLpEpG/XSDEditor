@@ -2,7 +2,9 @@ unit xsdtools;
 
 interface
 
-uses SysUtils, System.typinfo, Xml.XMLSchemaTags, XmlSchema,Xml.XMLIntf, Xml.XMLDoc, System.Variants,
+uses SysUtils, System.typinfo, Xml.XMLSchemaTags, XmlSchema,Xml.XMLIntf, Xml.XMLDoc, Xml.xmldom,
+     Winapi.MSXMLIntf, Winapi.msxml,Winapi.ActiveX, System.Win.ComObj,
+     System.Variants,
      System.RegularExpressions;
 
  type
@@ -209,6 +211,10 @@ function IsRepeatingValue(elem: IXMLElementDef): Boolean; overload;
 //function CloneElement(elemToClone: IXMLElementDef): IXMLElementDef;
 
 function ValidateData(data: IXMLTypeDef; var Value: Variant): Boolean;
+
+procedure ValidateXMLDoc(aXmlDoc: IXMLDocument);
+function ValidXML2(const xmlFile, nS, xmlSchemaFile: String; out err: IXMLDOMParseError): Boolean;
+
 
 type
  TCheckError=(
@@ -802,6 +808,38 @@ begin
   else Result := ct.BaseType;
 end;
 {$ENDREGION}
+
+
+procedure ValidateXMLDoc(aXmlDoc: IXMLDocument);
+var
+  validateDoc: IXMLDocument;
+begin
+  validateDoc := TXMLDocument.Create(nil);
+  validateDoc.ParseOptions := [poResolveExternals, poValidateOnParse];
+  validateDoc.XML := aXmlDoc.XML;
+  validateDoc.Active := true;
+end;
+
+function ValidXML2(const xmlFile, nS, xmlSchemaFile: String; out err: IXMLDOMParseError): Boolean;
+ var
+  xml, xsd: IXMLDOMDocument2;
+  cache: IXMLDOMSchemaCollection;
+begin
+  xsd := CoDOMDocument60.Create; // MSXMLDOMDocumentFactory.CreateDOMDocument as IXMLDOMDocument2;
+  xsd.Async := False;
+  xsd.resolveExternals := True;
+  xsd.load(xmlSchemaFile);
+
+  cache := CoXMLSchemaCache60.Create;
+  cache.add(ns, xsd);
+
+  xml := CoDOMDocument60.Create; // MSXMLDOMDocumentFactory.CreateDOMDocument as IXMLDOMDocument2;
+  xml.Async := False;
+  xml.schemas := cache;
+  xml.validateOnParse := True;
+  Result := xml.load(xmlFile);
+  err := xml.parseError;
+end;
 
 initialization
 

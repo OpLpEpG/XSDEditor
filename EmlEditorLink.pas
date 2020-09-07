@@ -6,6 +6,19 @@ uses SysUtils, StdCtrls, XmlSchema, TreeEditor, XSDEditorLink, xsdtools, System.
      System.RegularExpressions, System.UITypes, System.Types,
      Vcl.ExtCtrls;
 
+const EML_NS: TArray<string> =
+['eml="http://www.energistics.org/energyml/data/commonv2"',
+'gco="http://www.isotc211.org/2005/gco"',
+'gmd="http://www.isotc211.org/2005/gmd"',
+'gsr="http://www.isotc211.org/2005/gsr"',
+'gts="http://www.isotc211.org/2005/gts"',
+'gml="http://www.opengis.net/gml/3.2"',
+'xlink="http://www.w3.org/1999/xlink"',
+'xsi="http://www.w3.org/2001/XMLSchema-instance"'];
+
+//'xsi:schemaLocation="http://www.energistics.org/energyml/data/witsmlv2 file:///C:/repositories/witsml/v2.0/xsd_schemas/Well.xsd"
+
+
 type
 
  TEmlEditorLink = class (TXSDEditLink)
