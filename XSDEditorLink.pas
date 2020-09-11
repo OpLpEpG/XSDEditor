@@ -197,7 +197,7 @@ begin
     if (s = '') or (s = '0') or (s = '0.00') or (s = '0.0') or (s = '0.000') then
      begin
       Value := '';
-      nd.Columns[COLL_VAL].Dirty := False;
+//      nd.Columns[COLL_VAL].Dirty := False;
       Result := not nd.MastExists
      end
     else Result := ValidateData(PNodeExData(FNode.GetData).tip, Value)

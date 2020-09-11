@@ -31,8 +31,10 @@ type
   TColumnData = record
     EditType: TEditType;
     Value: Variant;
-    Dirty: Boolean;
-    Valid: Boolean;
+    FontStyles: TFontStyles;
+    FontColor: TColor;
+    BrashColor: TColor;
+    ImageIndex: Integer;
   end;
 
   PStdData = ^TStdData;
@@ -45,8 +47,9 @@ type
     Node: PVirtualNode;       // The node being edited.
     Column: Integer;          // The column of the node being edited.
     Value: Variant;
-    Dirty: Boolean;
-    Valid: Boolean;
+    FontStyles: TFontStyles;
+    FontColor: TColor;
+    BrashColor: TColor;
   end;
 
   TCreateEditor = procedure of object;
@@ -227,8 +230,8 @@ begin
   if not SameStr(S, Data.Columns[FColumn].Value) then
    begin
     V := S;
-    Data.Columns[FColumn].Dirty := True;
-    Data.Columns[FColumn].Valid := ValidateNewData(V);
+//    Data.Columns[FColumn].Dirty := True;
+//    Data.Columns[FColumn].Valid := ValidateNewData(V);
     Data.Columns[FColumn].Value := V;
     FTree.InvalidateNode(FNode);
    end;

@@ -252,7 +252,7 @@ begin
   for var I := 0 to High(Columns) do
    begin
     Columns[i].Value := '';
-    Columns[i].Valid := True;
+    Columns[i].BrashColor := clWhite;
    end;
 end;
 
@@ -325,7 +325,12 @@ begin
         n.columns[COLL_UOM].Value := '?';
        end;
      end;
-    if n.MastExists then n.Columns[COLL_VAL].Valid := False;
+    if n.MastExists then
+     begin
+      n.Columns[COLL_VAL].BrashColor := $E0E0FF;
+     end;
+
+//    if n.MastExists then n.Columns[COLL_VAL].Valid := False;
 //    n.columns[COLL_UOM].Value := TEST_GetSimple(e.DataType);
    end
   else
@@ -333,7 +338,10 @@ begin
     var ct := e.DataType as IXMLComplexTypeDef;
     n.nt := ntElemRoot;
     if ct.AbstractType then
+     begin
       n.Columns[COLL_TYPE].EditType := etPickString;
+      n.Columns[COLL_TYPE].FontColor := clRed;
+     end;
 //    n.columns[COLL_UOM].Value := TEST_GetComplex(ct);// SCM[ct.ContentModel]+ ' ' + SDM[ct.DerivationMethod];
    end;
 end;
@@ -346,7 +354,12 @@ begin
   n.columns[COLL_TREE].Value := e.Name;
   n.columns[COLL_TYPE].Value := e.DataTypeName;
   n.Columns[COLL_VAL].EditType := GlobalXSDEditLinkClass.GetEditorType(e);
-  if n.MastExists then n.Columns[COLL_VAL].Valid := False;
+  if n.MastExists then
+   begin
+    n.Columns[COLL_VAL].BrashColor := $E0E0FF;
+   end;
+
+//  if n.MastExists then n.Columns[COLL_VAL].Valid := False;
 //  n.columns[COLL_UOM].Value := TEST_GetSimple(e.DataType);
 end;
 
@@ -520,7 +533,7 @@ begin
     if a.Use = 'required' then
      begin
       Include(n.States, vsExpanded);
-      nd.Columns[COLL_VAL].Valid := False;
+//      nd.Columns[COLL_VAL].Valid := False;
      end;
 
     Tree.InvalidateNode(n);
@@ -566,7 +579,7 @@ begin
     TTreeData.Elem(nd, rd.node as IXMLElementDef);
 
     rd.Columns[COLL_VAL].Value := StrToInt(rd.Columns[COLL_VAL].Value) + 1;
-    rd.Columns[COLL_VAL].Dirty := True;
+//    rd.Columns[COLL_VAL].Dirty := True;
 
     AddComplexHistory(pv);
   finally
@@ -685,7 +698,7 @@ begin
     if nd.MastExists then
      begin
       Include(n.States, vsExpanded);
-      nd.Columns[COLL_VAL].Valid := False;
+//      nd.Columns[COLL_VAL].Valid := False;
      end;
     Tree.InvalidateNode(n);
    end;
@@ -888,16 +901,16 @@ begin
   if Assigned(Node) and ((Column <> Sender.FocusedColumn) or (Node <> Sender.FocusedNode)) then
   begin
     var nd := PnodeExData(Node.GetData);
-    if (nd.nt in [ntElemEditable, ntAttr]) and (Column = COLL_VAL)
-       and not nd.Columns[Column].Valid then
+    if (nd.nt in [ntElemEditable, ntAttr]) // and (Column = COLL_VAL)
+//       and not nd.Columns[Column].Valid
+    then
      begin
-      TargetCanvas.Brush.Color := $E0E0FF;
+      TargetCanvas.Brush.Color := nd.Columns[Column].BrashColor;//  NullDockSite. $E0E0FF;
       TargetCanvas.FillRect(CellRect);
-     end
-    else if nd.Columns[Column].Dirty then
-     begin
-      TargetCanvas.Brush.Color := $E0FFFF;
-      TargetCanvas.FillRect(CellRect);
+//    else if nd.Columns[Column].Dirty then
+//     begin
+//      TargetCanvas.Brush.Color := $E0FFFF;
+//      TargetCanvas.FillRect(CellRect);
      end;
   end;
 end;
