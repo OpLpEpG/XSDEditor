@@ -3,12 +3,14 @@ program ProjectXSDEditor;
 uses
   Vcl.Forms,
   XSDEditor in 'XSDEditor.pas' {FormXSD},
-  TreeEditor in 'TreeEditor.pas',
-  xsdtools in 'xsdtools.pas',
-  XSDEditorLink in 'XSDEditorLink.pas',
-  XSDEditorHint in 'XSDEditorHint.pas',
-  EmlEditorLink in 'EmlEditorLink.pas',
-  AnnotatedStringEditor in 'AnnotatedStringEditor.pas';
+  EditorLink.Base in 'EditorLink.Base.pas',
+  EditorLink.XSD in 'EditorLink.XSD.pas',
+  XSDEditor.Hint in 'XSDEditor.Hint.pas',
+  EditorLink.Eml in 'EditorLink.Eml.pas',
+  AnnotatedStringEditor in 'AnnotatedStringEditor.pas',
+  XSDTreeData in 'XSDTreeData.pas',
+  CsToPasTools in 'CsToPasTools.pas',
+  CsToPas in 'CsToPas.pas';
 
 {$R *.res}
 

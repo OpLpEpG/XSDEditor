@@ -2,7 +2,8 @@ unit AnnotatedStringEditor;
 
 interface
 
-uses SysUtils, Vcl.StdCtrls, Winapi.Windows, Winapi.Messages, System.Classes, Vcl.Controls, Vcl.Graphics;
+uses SysUtils, Vcl.StdCtrls, Winapi.Windows, Winapi.Messages, System.Classes, Vcl.Controls, Vcl.Graphics,
+     System.RegularExpressions;
 
 type
   TPickStringEditor = class(TComboBox)
@@ -56,7 +57,7 @@ begin
         Canvas.TextOut(Rect.Left + 2, Rect.Top, Items[Index]);
         if FAnnotations[Index] <> '' then
          begin
-          var R :=  Rect;
+          var R := Rect;
           R.Left := R.Left+ FmaxItemWidth + SPASE_ITEM_ANN;
           Canvas.Font.Color := $208020;
           Canvas.TextRect(R, FAnnotations[Index], [tfEndEllipsis, tfWordBreak]);
@@ -102,20 +103,20 @@ end;
 procedure TPickStringEditor.AddAnnotatedItem(const ItemName, Annotation: string);
 begin
   Items.Add(ItemName);
-  FAnnotations := FAnnotations + [Annotation];
+  FAnnotations := FAnnotations + [TRegEx.Replace(Annotation, '\s+', ' ').Trim];
 end;
 
 procedure TPickStringEditor.AdjustDropDown;
 var
-  Count: Integer;
+  Cnt: Integer;
 begin
-  Count := ItemCount;
-  if Count > DropDownCount then Count := DropDownCount;
-  if Count < 1 then Count := 1;
+  Cnt := ItemCount;
+  if Cnt > DropDownCount then Cnt := DropDownCount;
+  if Cnt < 5 then Cnt := 5;
   FDroppingDown := True;
   try
     FoldWidth := Width;
-    SetWindowPos(FDropHandle, 0, 0, 0, FWidth, ItemHeight * Count +
+    SetWindowPos(FDropHandle, 0, 0, 0, FWidth, ItemHeight * Cnt +
       Height + 2, SWP_NOMOVE or SWP_NOZORDER or SWP_NOACTIVATE or SWP_NOREDRAW or
       SWP_HIDEWINDOW);
   finally

@@ -1,15 +1,15 @@
-unit XSDEditorHint;
+unit XSDEditor.Hint;
 
 interface
 
-uses System.SysUtils, System.Classes, System.Types, System.Variants, Vcl.Graphics, VirtualTrees, xsdtools,
-     Xml.XmlSchema, Vcl.Forms,Vcl.Themes, Vcl.GraphUtil;
+uses System.SysUtils, System.Classes, System.Types, System.Variants, Vcl.Graphics, VirtualTrees, System.Rtti,
+     Vcl.Forms,Vcl.Themes, Vcl.GraphUtil, System.RegularExpressions;
 
 procedure ConnectXSDTreeHintAdapter(form: TForm);
 
 implementation
 
-uses XSDEditor;
+uses XSDEditor, CsToPas, CsToPasTools, XSDTreeData, EditorLink.Base;
 
 {$REGION 'AnyStyleText'}
 type
@@ -88,6 +88,30 @@ end;
 
 { THintAdapter }
 
+function GetAnnotationEx(e: TTypedTreeData; ParentTypeAnnotation: Boolean = False;
+         const IgnoreItems: TArray<string> = []): TArray<string>;
+  procedure AddDocumentation(SchemaItem: IXmlSchemaAnnotated; const Pre: string = '');
+  begin
+    var s := string(SchemaItem.GetAnnotation);
+     if s <> '' then Result :=  Result + [Pre + TRegEx.Replace(s, '\s+', ' ').Trim]
+  end;
+  function IsIgnore(ann: IXmlSchemaType): Boolean;
+  begin
+    for var s in IgnoreItems do if SameStr(ann.QualifiedName.Name, s) then Exit(True);
+    Result := False;
+  end;
+begin
+  Result := [];
+  if not IsIgnore(e.SchemaType) then AddDocumentation(e.Annotated);
+  var Dt := e.SchemaType;
+  while Assigned(Dt) do
+   begin
+    if not IsIgnore(dt) then AddDocumentation(Dt as IXmlSchemaAnnotated, string(Dt.QualifiedName.Name)+' : ');
+    if ParentTypeAnnotation then Dt := Dt.BaseXmlSchemaType else Dt := nil;
+   end;
+end;
+
+
 procedure THintAdapter.DrawHint(Sender: TBaseVirtualTree; HintCanvas: TCanvas; Node: PVirtualNode; R: TRect; Column: TColumnIndex);
  var
   top :Integer;
@@ -119,14 +143,21 @@ begin
 end;
 
 type
-  TLevelHistorySimpleFunc = reference to procedure (level: Integer; Simple: IXMLSimpleTypeDef);
+  TLevelHistorySimpleFunc = reference to procedure (level: Integer; Simple: IXmlSchemaSimpleType);
 
-procedure WolkHistoryLevel(level: Integer; Root: TSimpleHistory; func: TLevelHistorySimpleFunc);
- procedure Recur(lvl: Integer; r: TSimpleHistory);
+procedure WolkHistoryLevel(level: Integer; Root: IXmlSchemaSimpleType; func: TLevelHistorySimpleFunc);
+ procedure Recur(lvl: Integer; st: IXmlSchemaSimpleType);
+  var
+   u: IXmlSchemaSimpleTypeUnion;
+   t: IXmlSchemaType;
  begin
-   func(lvl, r.SimpleType);
+   t := st as IXmlSchemaType;
+   func(lvl, st);
    inc(lvl);
-   for var bt in r.BaseArray do Recur(lvl, bt);
+   if Supports(st.Content, IXmlSchemaSimpleTypeUnion, u) then
+     for var i := 0 to u.Count-1 do Recur(lvl, u[i])
+   else
+     if Assigned(t.BaseXmlSchemaType) then Recur(lvl, t.BaseXmlSchemaType as IXmlSchemaSimpleType);
  end;
 begin
   Recur(level, Root);
@@ -134,18 +165,19 @@ end;
 
 procedure THintAdapter.GetHintSize(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; var R: TRect);
  var
-  nd: PNodeExData;
+  nd: TTypedTreeData;
 begin
   if not (Column in [COLL_TREE, COLL_TYPE]) then Exit;
   var MAXCLIENTW := Form.Width div 2 - 10;
-  nd := Tree.GetNodeData(Node);
+  if GetTD(Node) is TTypedTreeData then  nd := GetTD(Node) as TTypedTreeData
+  else Exit;
   Form.Canvas.Font := Screen.HintFont;
   case Column of
     COLL_TREE:
      begin
       outText := '';
       var tmpWidth := 0;
-      for var ann in GetAnnotationEx(nd.node, true, Form.IgnoreAnnotations) do
+      for var ann in GetAnnotationEx(nd as TTypedTreeData, true, Form.IgnoreAnnotations) do
        begin
         var w := Form.Canvas.TextWidth(ann);
         if W > tmpWidth then
@@ -165,102 +197,105 @@ begin
      end;
     COLL_TYPE:
      begin
-      if nd.nt > ntAttr then Exit;
       typeText := [];
       var level := 0;
       var tmpZ := Tsize.Create(0,0);
 
-      var AddComplexHictory := procedure(h : TComplexHistory)
+      var AddComplexHictory := function(c: IXmlSchemaComplexType): IXmlSchemaSimpleType
       begin
-        for var i:= High(h) downto 0 do
+        Result := nil;
+        var t := c as IXmlSchemaType;
+        while Assigned(c) do
          begin
-          var c := h[i];
           var l: TAnyStyleLine;
           l.Level := level;
           inc(level);
-          if c.AbstractType then l.Add(c.Name, clRed) else
-          if i = High(h) then l.Add(c.Name, clBlue, [fsBold])
-          else l.Add(c.Name, clBlue);
-          l.Add(SCM[c.ContentModel], clMaroon, [fsItalic]);
-          l.Add(SDM[c.DerivationMethod], clMaroon, [fsItalic]);
+          if c.IsAbstract then l.Add(t.QualifiedName.Name, clRed) else
+          if Supports(t.BaseXmlSchemaType, IXmlSchemaSimpleType, Result) then
+               l.Add(t.QualifiedName.Name, clBlue, [fsBold])
+          else l.Add(t.QualifiedName.Name, clBlue);
+          l.Add(CtToString(c.ContentTypeParticle), clMaroon, [fsItalic]);
+          l.Add(CmToString(c), clMaroon, [fsItalic]);
           l.UpdateWidth(Form.Canvas);
           if tmpZ.cx < l.cx then tmpZ.cx := l.cx;
           tmpZ.cy := tmpZ.cy + l.cy;
           typeText :=  typeText + [l];
+          t := t.BaseXmlSchemaType;
+          Supports(t, IXmlSchemaComplexType, c);
          end;
       end;
 
-      if TypeHasValue(nd.tip) then
-       begin
-        var h := HistoryHasValue(nd.tip);
-        AddComplexHictory(h.ComplexTypes);
-        WolkHistoryLevel(level, h.BaseSimple, procedure (lvl: Integer; a: IXMLSimpleTypeDef)
-          procedure AddFacet(f: Variant; const name: string);
-          begin
-            if not VarIsNull(f) then
-             begin
+      var AddAtomic := procedure(nda: TTypedTreeData)
+      begin
+        if (Assigned(nda.Complex) and (nda.Complex.ContentType = scTextOnly)) or Assigned(nda.Simple)  then
+         begin
+          var s := nda.Simple;
+          if not Assigned(s) then s := AddComplexHictory(nda.Complex);
+          WolkHistoryLevel(level, s, procedure (lvl: Integer; a: IXmlSchemaSimpleType)
+            procedure AddFacet(const name, value: string);
+            begin
               var l: TAnyStyleLine;
               l.Level := lvl;
               l.Add(name, clOlive, [fsBold]);
               l.Add('=', clBlack, [fsBold]);
-              l.Add(f, clRed, [fsBold]);
-//              ss.Add(name + '=' + f);
+              l.Add(value, clRed, [fsBold]);
+  //              ss.Add(name + '=' + f);
               l.UpdateWidth(Form.Canvas);
               if tmpZ.cx < l.cx then tmpZ.cx := l.cx;
               tmpZ.cy := tmpZ.cy + l.cy;
               typeText :=  typeText + [l];
-             end;
-          end;
-          procedure AddAtomic(tip: IXMLTypeDef);
+            end;
+            procedure AddAtomic(fs: IXmlSchemaObjectCollection);
+            begin
+              if fs.Count > 1 then AddFacet('Enumeration:Count', fs.Count.ToString)
+              else for var f in XFacets(fs) do AddFacet(FacetToString(f.FacetType), f.Value)
+            end;
           begin
-           // ss.Add('-----------Main Facets------------');
-            AddFacet(tip.Ordered, 'Ordered');
-            AddFacet(tip.Bounded,'Bounded');
-            AddFacet(tip.Cardinality,'Cardinality');
-            AddFacet(tip.Numeric,'Numeric');
-           // ss.Add('-----------Facets------------');
-            AddFacet(tip.Length,'Length');
-            AddFacet(tip.MinLength,'MinLength');
-            AddFacet(tip.MaxLength,'MaxLength');
-            AddFacet(tip.Pattern,'Pattern');
-            AddFacet(tip.Whitespace,'Whitespace');
-            AddFacet(tip.MaxInclusive,'MaxInclusive');
-            AddFacet(tip.MaxExclusive,'MaxExclusive');
-            AddFacet(tip.MinInclusive,'MinInclusive');
-            AddFacet(tip.MinExclusive,'MinExclusive');
-            AddFacet(tip.TotalDigits,'TotalDigits');
-            AddFacet(tip.FractionalDigits,'FractionalDigits');
-            if tip.Enumerations.Count > 0 then AddFacet(tip.Enumerations.Count,'Enumeration:Count');
+            var l: TAnyStyleLine;
+            l.Level := lvl;
+            var t := a as IXmlSchemaType;
+            var sname := t.QualifiedName.Name;
+            if sname = '' then sname := 'anonymous';
+            var fs: TFontStyles := [];
+            if lvl = 0 then fs := [fsBold];
+            if not Assigned(t.BaseXmlSchemaType) then l.Add(sname, clGreen, fs)
+            else if t.Variety = dvUnion then l.Add(sname, clFuchsia, fs)
+            else if sname = 'anonymous' then l.Add(sname, clRed, fs)
+            else l.Add(sname, clblack, fs);
+            l.Add(DmToString(t.DerivedBy), clMaroon, [fsItalic]);
 
+            l.UpdateWidth(Form.Canvas);
+            if tmpZ.cx < l.cx then tmpZ.cx := l.cx;
+            tmpZ.cy := tmpZ.cy + l.cy;
+            typeText :=  typeText + [l];
+
+            var rs: IXmlSchemaSimpleTypeRestriction;
+            if Supports(a.Content, IXmlSchemaSimpleTypeRestriction, rs) then AddAtomic(rs.Facets);
+          end);
+         end
+        else
+         begin
+          AddComplexHictory(nda.Complex);
+         end;
+       end;
+
+      if nd is TChoiceElem then
+       begin
+         var ce := nd as TChoiceElem;
+         var savec := ce.Current;
+         for var i := 0 to ce.Count-1 do
+          begin
+           ce.Current := i;
+           level := 0;
+           AddAtomic(nd);
           end;
-        begin
-          var l: TAnyStyleLine;
-          l.Level := lvl;
-          var sname := '';
-          if a.IsAnonymous then sname := 'anonymous'
-          else sname := a.Name;
-          var fs: TFontStyles := [];
-          if lvl = 0 then fs := [fsBold];
-          if a.IsBuiltInType then l.Add(sname, clGreen, fs)
-          else if a.DerivationMethod = sdmUnion then l.Add(sname, clFuchsia, fs)
-          else if sname = 'anonymous' then l.Add(sname, clRed, fs)                         
-          else l.Add(sname, clblack, fs); 
-          l.Add(SSDM[a.DerivationMethod], clMaroon, [fsItalic]);
-               
-          l.UpdateWidth(Form.Canvas);
-          if tmpZ.cx < l.cx then tmpZ.cx := l.cx;
-          tmpZ.cy := tmpZ.cy + l.cy;
-          typeText :=  typeText + [l];
-
-          AddAtomic(a);
-        end);
+         ce.Current := savec;
        end
-      else AddComplexHictory(HistoryComplex(nd.tip));
-
+      else AddAtomic(nd);
       R.Size := tmpZ;
       InflateRect(R, 5, 5);
      end;
-  end;
+  end;  //}
 end;
 
 procedure ConnectXSDTreeHintAdapter(form: TForm);

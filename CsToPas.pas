@@ -12,7 +12,7 @@ type
     ///
     /// Сводка:
     ///     Предоставляет различные методы для предотвращения создания производных типов.
-    XmlSchemaDerivationMethod = set of
+    XmlSchemaDerivationMethod =
     (
        ///
        /// Сводка:
@@ -42,13 +42,13 @@ type
         ///
         /// Сводка:
         ///     #all. Ссылается на все методы вывода.
-        dmAll = 255
+        dmAll = 255,
         ///
         /// Сводка:
         ///     Принимает метод создания производных по умолчанию.
-        //dmNone = 256
+        dmNone = 256
     );
-const dmNone = 256;
+//const dmNone = 256;
 type
     ///
     /// Сводка:
@@ -191,7 +191,7 @@ type
         ///
         /// Сводка:
         ///     Схемы W3C XML xs:string типа.
-        tctcString = 12,
+        tcString = 12,
         ///
         /// Сводка:
         ///     Схемы W3C XML xs:boolean типа.
@@ -307,7 +307,7 @@ type
         ///
         /// Сводка:
         ///     Схемы W3C XML xs:nonPositiveInteger типа.
-        NonPositiveInteger = 41,
+        tcNonPositiveInteger = 41,
         ///
         /// Сводка:
         ///     Схемы W3C XML xs:negativeInteger типа.
@@ -432,6 +432,7 @@ type
 
     XmlSchemaFacets =
     (
+       sfERROR = 0,
        sfPattern = 1,
        sfLength = 2,
        sfMinLength = 3,
@@ -699,8 +700,9 @@ type
 
   IXmlSchemaObjectCollection = interface // IXMLEnumerable
   ['{29854D89-BD09-4627-B8E7-C648DA4131A9}']
-    function Count(): Integer; safecall;
+    function getCount(): Integer; safecall;
     function GetItem(index: Integer): TCSharp; safecall;
+    property Count: Integer read getCount;
   end;
  {$ENDREGION 'misc'}
 
@@ -867,15 +869,18 @@ type
   IXmlSchemaType = interface // abstract IXmlSchemaAnnotated IXmlSchemaObject
   ['{0AC541BF-F7D6-4770-9D7A-21C9599D7A36}']
     function BaseXmlSchemaType(): IXmlSchemaType; safecall;
-    function TokenizedType(): XmlTokenizedType; safecall;
-    function Variety(): XmlSchemaDatatypeVariety; safecall;
+    function getTokenizedType(): XmlTokenizedType; safecall;
+    function getVariety(): XmlSchemaDatatypeVariety; safecall;
     function DerivedBy(): TXmlSchemaDerivationMethod; safecall;
     function Final(): TXmlSchemaDerivationMethod; safecall;
     function FinalResolved(): TXmlSchemaDerivationMethod; safecall;
     function IsMixed():Boolean; safecall;
     function Name():PChar; safecall;
     function QualifiedName(): IXmlQualifiedName; safecall;
-    function TypeCode(): XmlTypeCode; safecall;
+    function getTypeCode(): XmlTypeCode; safecall;
+    property TypeCode: XmlTypeCode read getTypeCode;
+    property Variety: XmlSchemaDatatypeVariety read getVariety;
+    property TokenizedType: XmlTokenizedType read getTokenizedType;
   end;
 
   IXmlSchemaParticle = interface // abstract IXmlSchemaAnnotated IXmlSchemaObject
@@ -999,7 +1004,7 @@ type
   ///
   /// Возврат:
   ///     Значение модели содержимого для сложного типа после компиляции.
-  function  ContentType(): XmlSchemaContentType; safecall;
+  function  getContentType(): XmlSchemaContentType; safecall;
   ///
   /// Сводка:
   ///     Возвращает фрагмент, который содержит значение после компиляции для System.Xml.Schema.XmlSchemaComplexType.ContentType
@@ -1018,7 +1023,7 @@ type
   /// Возврат:
   ///     Значение информационного набора после проверки схемы. Значение по умолчанию —
   ///     BlockDefault значение на schema элемент.
-  function BlockResolved():TXmlSchemaDerivationMethod; safecall;
+  function BlockResolved(): TXmlSchemaDerivationMethod; safecall;
   ///
   /// Сводка:
   ///     Возвращает коллекцию всех соответствующих атрибутов данного сложного типа и его
@@ -1028,6 +1033,7 @@ type
   ///     Коллекция всех атрибутов из данного сложного типа и его базовых типов. Значение
   ///     после компиляции AttributeUses свойство.
   function AttributeUses(): IXmlSchemaObjectTable; safecall;
+  property ContentType: XmlSchemaContentType read getContentType;
  end;
 
  IXmlSchemaSimpleTypeContent = interface // abstract IXmlSchemaAnnotated IXmlSchemaObject
@@ -1042,15 +1048,17 @@ type
  IXmlSchemaSimpleTypeUnion = interface
  // IXmlSchemaSimpleTypeContent  IXmlSchemaAnnotated IXmlSchemaObject
  ['{848EB345-57C8-49E3-A1CC-FB8788DDB1FD}']
-   function Count(): Integer;safecall;
-   function Item(Index: Integer): IXmlSchemaSimpleType; safecall;
+   function Count(): Integer; safecall;
+   function getItem(Index: Integer): IXmlSchemaSimpleType; safecall;
+   property Items[index: Integer]: IXmlSchemaSimpleType read getItem; default;
  end;
 
  IXmlSchemaFacet = interface  //IXmlSchemaAnnotated IXmlSchemaObject
  ['{4C823B54-2055-4542-B763-C8628F3033D3}']
    function Value(): PChar; safecall;
    function IsFixed(): Boolean; safecall;
-   function  FacetType(): XmlSchemaFacets; safecall;
+   function getFacetType(): XmlSchemaFacets; safecall;
+   property FacetType: XmlSchemaFacets read getFacetType;
  end;
  IXmlSchemaSimpleTypeRestriction = interface
  // IXmlSchemaSimpleTypeContent  IXmlSchemaAnnotated IXmlSchemaObject
@@ -1118,7 +1126,7 @@ type
   ///     Optional.
   ///[DefaultValue(false)]
   ///[XmlAttribute("abstract")]
-  function IsAbstract(): Boolean; safecall;
+  function getIsAbstract(): Boolean; safecall;
   ///
   /// Сводка:
   ///     Gets or sets the form for the element.
@@ -1156,7 +1164,7 @@ type
   ///     The Final property. The default is XmlSchemaDerivationMethod.None. Optional.
   ///[DefaultValue(XmlSchemaDerivationMethod.None)]
   ///[XmlAttribute("final")]
-  function Final():TXmlSchemaDerivationMethod; safecall;
+  function Final(): TXmlSchemaDerivationMethod; safecall;
   ///
   /// Сводка:
   ///     Gets an System.Xml.Schema.XmlSchemaType object representing the type of the element
@@ -1194,7 +1202,7 @@ type
   /// Возврат:
   ///     The post-compilation value of the Block property. The default is the BlockDefault
   ///     value on the schema element.
-  function BlockResolved(): TXmlSchemaDerivationMethod; safecall;
+  function BlockResolved():  XmlSchemaDerivationMethod; safecall;
   ///
   /// Сводка:
   ///     Gets or sets a Block derivation.
@@ -1222,6 +1230,7 @@ type
   ///     The qualified name of an element that is being substituted by this element. Optional.
   /// [XmlAttribute("substitutionGroup")]
   function SubstitutionGroup(): IXmlQualifiedName; safecall;
+  property IsAbstract: Boolean read getIsAbstract;
  end;
 
  IXmlSchemaAttribute = interface
@@ -2695,6 +2704,8 @@ procedure GetXmlQualifiedName(obj: TCSharp;
                                 out intf: IXmlQualifiedName); stdcall; external 'cstopas.dll';
 procedure GetXmlSchemaObject(obj: TCSharp;
                                 out intf: IXmlSchemaObject); stdcall; external 'cstopas.dll';
+procedure GetXmlSchemaParticle(obj: TCSharp;
+                                out intf: IXmlSchemaParticle); stdcall; external 'cstopas.dll';
 procedure GetXmlSchema(obj: TCSharp;
                                 out intf: IXmlSchema); stdcall; external 'cstopas.dll';
 procedure GetXmlSchemaAttribute(obj: TCSharp;
@@ -2713,8 +2724,11 @@ procedure GetXmlSchemaAnnotation(obj: TCSharp;
                                 out intf: IXmlSchemaAnnotation); stdcall; external 'cstopas.dll';
 procedure GetXmlSchemaExternal(obj: TCSharp;
                                 out intf: IXmlSchemaExternal); stdcall; external 'cstopas.dll';
+procedure GetXmlSchemaFacet(obj: TCSharp;
+                                out intf: IXmlSchemaFacet); stdcall; external 'cstopas.dll';
 
 function XObjects(Enum: IInterface): TXEnum<IXmlSchemaObject>;
+function XParticles(Enum: IInterface): TXEnum<IXmlSchemaParticle>;
 function XIncludes(Enum: IInterface): TXEnum<IXmlSchemaExternal>;
 function XNames(Enum: IInterface): TXEnum<IXmlQualifiedName>;
 function XAttributes(Enum: IInterface): TXEnum<IXmlSchemaAttribute>;
@@ -2724,9 +2738,18 @@ function XSchemas(Enum: IInterface): TXEnum<IXmlSchema>;
 function XGroups(Enum: IInterface): TXEnum<IXmlSchemaGroup>;
 function XAttributeGroups(Enum: IInterface): TXEnum<IXmlSchemaAttributeGroup>;
 function XNotations(Enum: IInterface): TXEnum<IXmlSchemaNotation>;
+function XFacets(Enum: IInterface): TXEnum<IXmlSchemaFacet>;
 
 implementation
 
+function XFacets(Enum: IInterface): TXEnum<IXmlSchemaFacet>;
+begin
+  Result := TXEnum<IXmlSchemaFacet>.Create(Enum as IXMLEnumerable, GetXmlSchemaFacet);
+end;
+function XParticles(Enum: IInterface): TXEnum<IXmlSchemaParticle>;
+begin
+  Result := TXEnum<IXmlSchemaParticle>.Create(Enum as IXMLEnumerable, GetXmlSchemaParticle);
+end;
 function XIncludes(Enum: IInterface): TXEnum<IXmlSchemaExternal>;
 begin
   Result := TXEnum<IXmlSchemaExternal>.Create(Enum as IXMLEnumerable, GetXmlSchemaExternal);
