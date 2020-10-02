@@ -41,7 +41,7 @@ type
     procedure TreeFocusChanging(Sender: TBaseVirtualTree; OldNode, NewNode: PVirtualNode; OldColumn, NewColumn: TColumnIndex; var Allowed: Boolean);
     procedure TreeBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex; CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
     procedure TreeGetPopupMenu(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; const P: TPoint;     var AskParent: Boolean; var PopupMenu: TPopupMenu);
-    procedure DeleteClick(Sender: TObject);
+    procedure EmptyClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure TreeExpanding(Sender: TBaseVirtualTree; Node: PVirtualNode; var Allowed: Boolean);
     procedure TreeNodeClick(Sender: TBaseVirtualTree; const HitInfo: THitInfo);
@@ -178,31 +178,22 @@ begin
   Finalize(nd^);
 end;
 
-procedure TFormXSD.DeleteClick(Sender: TObject);
-// var
-//  pv: PVirtualNode;
+procedure TFormXSD.EmptyClick(Sender: TObject);
 begin
-{  pv := PVirtualNode(Popup.Tag);
-  var rp := PnodeExData(FindRepeaterNode(pv).GetData);
-  Tree.DeleteNode(pv);
-  rp.Columns[COLL_VAL].Value := Integer(rp.Columns[COLL_VAL].Value) - 1; }
+  var pv := PVirtualNode(Popup.Tag);
+  var tt := GetTD(PVirtualNode(Popup.Tag));
+  (tt as TTypedTreeData).Empty(Tree);
+  TDocData.New(tree, pv, tt.Annotated);
 end;
 
 procedure TFormXSD.TreeGetPopupMenu(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; const P: TPoint; var AskParent: Boolean; var PopupMenu: TPopupMenu);
-// var
-//  nd: PNodeExData;
 begin
-{  AskParent := False;
-  nd := Tree.GetNodeData(Node);
-  if nd.ManyExistsItem then
+  AskParent := False;
+  if (GetTD(Node) is TTypedTreeData) and (Column = COLL_TREE) then
    begin
-    var rp := PnodeExData(FindRepeaterNode(Node).GetData);
-    if Integer(rp.Columns[COLL_VAL].Value) > StrToInt((nd.node as IXMLElementDef).MinOccurs) then
-     begin
-      PopupMenu := Popup;
-      PopupMenu.Tag := Integer(Node);
-     end;
-   end;}
+    PopupMenu := Popup;
+    PopupMenu.Tag := Integer(Node);
+   end;
 end;
 
 procedure TFormXSD.TreeCreateEditor(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; out EditLink: IVTEditLink);

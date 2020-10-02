@@ -1,46 +1,26 @@
 unit EditorLink.Base;
 
-// Utility unit for the advanced Virtual Treeview demo application which contains the implementation of edit link
-// interfaces used in other samples of the demo.
-
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, VirtualTrees, ExtDlgs, ImgList, Buttons, ExtCtrls, ComCtrls,
-  Mask, JvSpin;
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, StdCtrls, VirtualTrees, ComCtrls, JvSpin;
 
 type
-  // Describes the type of value a property tree node stores in its data property.
-  TEditType = (
-    etNone,
-    etString,
-    etPickString,
-    etRegexEdit,
-    etNumber,
-    etFloat,
-    etBoolean,
-    etMemo,
-    etDate,
-    etUnion);
-
-//----------------------------------------------------------------------------------------------------------------------
-// Node data record for the the document properties treeview.
-
   TColumnData = class;
   TTreeEditLink = class;
   TDataEditor = class abstract(TInterfacedObject)
   private
-    procedure SetEdit(const Value: TWinControl);
-    function GetEdit: TWinControl;
-    function GetTree: TVirtualStringTree;
+   procedure SetEdit(const Value: TWinControl);
+   function GetEdit: TWinControl;
+   function GetTree: TVirtualStringTree;
   public
    FValue: TColumnData;
-   FNewValue: Variant;
+   FNewValue: string;
    FOwner: TTreeEditLink;
    constructor Create(AOwner: TTreeEditLink; Value: TColumnData); virtual;
-   procedure GetNewData(); virtual;
+   procedure UpdateNewValue(); virtual;
    procedure SetBounds(var R: TRect); virtual;
+   property NewValue: string read FNewValue;
    property Edit: TWinControl read GetEdit write SetEdit;
    property Tree: TVirtualStringTree read GetTree;
    property Link: TTreeEditLink read FOwner;
@@ -55,14 +35,14 @@ type
   end;
   TDateTimeEditor = class(TDataEditor)
    constructor Create(AOwner: TTreeEditLink; Value: TColumnData); override;
-   procedure GetNewData(); override;
+   procedure UpdateNewValue(); override;
   end;
   TMemoEditor = class(TDataEditor)
    constructor Create(AOwner: TTreeEditLink; Value: TColumnData); override;
    procedure SetBounds(var R: TRect); override;
   end;
   TjvNumEditEditor = class(TDataEditor)
-   procedure GetNewData(); override;
+   procedure UpdateNewValue(); override;
   end;
   TNumberEditor = class(TjvNumEditEditor)
    constructor Create(AOwner: TTreeEditLink; Val: TColumnData); override;
@@ -71,17 +51,26 @@ type
    constructor Create(AOwner: TTreeEditLink; Val: TColumnData); override;
   end;
 
-  TValidator = class abstract(TInterfacedObject)
-   procedure Validate(Editor: TDataEditor; Data: TColumnData); virtual; abstract;
+  TColumnDataValidator = class abstract(TInterfacedObject)
+  public
+   FEditor: TDataEditor;
+   FData: TColumnData;
+   constructor Create(AEditor: TDataEditor; AData: TColumnData); virtual;
+   function CheckValid: Boolean; virtual; abstract;
   end;
-  TValidatorClass = class of TValidator;
+  TValidatorClass = class of TColumnDataValidator;
+
+  TUpdateViewData = procedure (Tree: TBaseVirtualTree; ColumnData: TColumnData) of object;
   TColumnData = class sealed (TInterfacedObject)
   private
     procedure SetImageIndex(const Value: Integer);
     procedure SetStateImageIndex(const Value: Integer);
   public
+    Owner: PVirtualNode;
+    Index: Integer;
     EditType: TDataEditorClass;
-    Value: Variant;
+    Value: string;
+    IsValid: Boolean;
     FontStyles: TFontStyles;
     FontColor: TColor;
     BrashColor: TColor;
@@ -92,8 +81,10 @@ type
     FStateImageIndex: Integer;
     StatexpandedImageIndex: Integer;
     Validator: TValidatorClass;
-    constructor Create;
+    UpdateViewDataFunc: TUpdateViewData;
+    constructor Create(AOwner: PVirtualNode; AIndex: Integer);
     destructor Destroy; override;
+    procedure UpdateViewData(Tree: TBaseVirtualTree);
     property ImageIndex: Integer read FImageIndex write SetImageIndex;
     property StateImageIndex: Integer read FStateImageIndex write SetStateImageIndex;
   end;
@@ -140,6 +131,7 @@ type
 
 implementation
 
+{$REGION 'TPropertyEditLink'}
 //----------------- TPropertyEditLink ----------------------------------------------------------------------------------
 
 // This implementation is used in VST3 to make a connection beween the tree
@@ -224,7 +216,7 @@ begin
 end;
 
 procedure TTreeEditLink.SetBounds(R: TRect);
-var
+ var
   Dummy: Integer;
 begin
   // Since we don't want to activate grid extensions in the tree (this would influence how the selection is drawn)
@@ -249,20 +241,21 @@ begin
 end;
 
 function TTreeEditLink.EndEdit: Boolean;
-var
-  Data: PStdData;
-  Validator: TValidator;
+ var
+  ColData: TColumnData;
+  Validator: TColumnDataValidator;
 begin
   Result := True;
-  Data := FNode.GetData();
-  FDataEdit.GetNewData();
-  if Assigned(Data.Columns[FColumn].Validator) then
+  ColData := PStdData(FNode.GetData()).Columns[FColumn];
+  FDataEdit.UpdateNewValue();
+  ColData.Value := FDataEdit.FNewValue;
+  if Assigned(ColData.Validator) then
    begin
-    Validator := Data.Columns[FColumn].Validator.Create;
-    Validator.Validate(FDataEdit, Data.Columns[FColumn])
+    Validator := ColData.Validator.Create(FDataEdit, ColData);
+    ColData.IsValid := Validator.CheckValid;
    end;
-  Data.Columns[FColumn].Value := FDataEdit.FNewValue;
-  FTree.InvalidateNode(FNode);
+  ColData.UpdateViewData(FTree);
+//  FTree.InvalidateNode(FNode);
   FEdit.Hide;
   FTree.SetFocus;
 end;
@@ -271,6 +264,7 @@ function TTreeEditLink.GetBounds: TRect;
 begin
   Result := FEdit.BoundsRect;
 end;
+{$ENDREGION}
 
 {$REGION 'Editors'}
 { TStringEditor }
@@ -370,9 +364,11 @@ begin
     end;
 end;
 
-procedure TjvNumEditEditor.GetNewData;
+procedure TjvNumEditEditor.UpdateNewValue;
 begin
-  FNewValue := (FOwner.FEdit as TJvSpinEdit).Text;
+  FNewValue := string((FOwner.FEdit as TJvSpinEdit).Text).Trim;
+  if (FNewValue = '0') or (FNewValue = '0.0') or (FNewValue = '0.00') or (FNewValue = '0.000') then
+     FNewValue := '';
 end;
 
 { TFloatEditor }
@@ -393,7 +389,7 @@ begin
    end;
 end;
 
-procedure TDateTimeEditor.GetNewData;
+procedure TDateTimeEditor.UpdateNewValue;
 begin
   if TDateTimePicker(FOwner.FEdit).Date = 0 then FNewValue := ''
   else FNewValue := DateToStr(TDateTimePicker(FOwner.FEdit).Date);
@@ -416,12 +412,12 @@ begin
   FOwner.FEdit := Value;
 end;
 
-procedure TDataEditor.GetNewData;
+procedure TDataEditor.UpdateNewValue;
 var
   Buffer: array[0..1024] of Char;
 begin
   GetWindowText(Edit.Handle, Buffer, 1024);
-  FNewValue := string(Buffer);
+  FNewValue := string(Buffer).Trim;
 end;
 
 function TDataEditor.GetTree: TVirtualStringTree;
@@ -435,13 +431,14 @@ end;
 
 {$ENDREGION}
 
-{ TValidator }
-
 { TColumnData }
 
-constructor TColumnData.Create;
+constructor TColumnData.Create(AOwner: PVirtualNode; AIndex: Integer);
 begin
+  Owner := AOwner;
+  Index := AIndex;
   Value := '';
+  IsValid := True;
   FontStyles := [];
   FontColor := clBlack;
   BrashColor := clWhite;
@@ -451,7 +448,6 @@ end;
 
 destructor TColumnData.Destroy;
 begin
-
   inherited;
 end;
 
@@ -467,13 +463,18 @@ begin
   StatexpandedImageIndex := Value;
 end;
 
+procedure TColumnData.UpdateViewData(Tree: TBaseVirtualTree);
+begin
+  if Assigned(UpdateViewDataFunc) then UpdateViewDataFunc(Tree, Self);
+end;
+
 { TStdData }
 
 constructor TStdData.Create(AOwner: PVirtualNode; ColCount: Integer);
 begin
   FOwner := AOwner;
   SetLength(FColumns, ColCount);
-  for var i := 0 to High(FColumns) do FColumns[i] := TColumnData.Create;
+  for var i := 0 to High(FColumns) do FColumns[i] := TColumnData.Create(AOwner, i);
 end;
 
 destructor TStdData.Destroy;
@@ -484,6 +485,14 @@ end;
 function TStdData.GetColumn(Index: Integer): TColumnData;
 begin
   Result := FColumns[Index] as TColumnData;
+end;
+
+{ TValidator }
+
+constructor TColumnDataValidator.Create(AEditor: TDataEditor; AData: TColumnData);
+begin
+  FEditor := AEditor;
+  FData := AData;
 end;
 
 end.

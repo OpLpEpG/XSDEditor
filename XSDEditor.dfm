@@ -1465,8 +1465,8 @@ object FormXSD: TFormXSD
     Left = 96
     Top = 32
     object Delete: TMenuItem
-      Caption = 'Delete'
-      OnClick = DeleteClick
+      Caption = 'Clear'
+      OnClick = EmptyClick
     end
   end
 end

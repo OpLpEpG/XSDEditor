@@ -58,18 +58,7 @@ const
         tcAnyUri,
         tcQName,
         tcNotation];
-//type
-// TXSSimpleHistory = record
-//   SimpleType: IXmlSchemaSimpleType;
-//   BaseArray: TArray<TXSSimpleHistory>;
-// end;
-//
-// TXSComplexHistory = TArray<IXmlSchemaComplexType>;
-// Has Value
-// TXSHistory = record
-//   ComplexTypes: TXSComplexHistory;
-//   BaseSimple: TXSSimpleHistory;
-// end;
+
 function DmToString(idm: TXmlSchemaDerivationMethod): string;
 function CtToString(p: IXmlSchemaParticle): string;
 function CmToString(c: IXmlSchemaComplexType): string;

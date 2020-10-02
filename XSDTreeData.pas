@@ -7,10 +7,24 @@ uses  System.SysUtils, System.UITypes, System.Rtti,
       VirtualTrees,
       EditorLink.Base, CsToPas, CsToPasTools;
 
-   const FONT_TREE_COLOR: array [Boolean, Boolean] of TColor =
 
+const
+       CL_BRER = $E0E0FF;
+                       // req    manyExisis
+ FONT_TREE_COLOR: array [Boolean, Boolean] of TColor =
+          // req    manyExisis
          ((clGray, $808060),
           (clBlack, clGreen));
+                     //  req      empty    valid
+ BRUSH_VAL_COLOR: array [Boolean, Boolean, Boolean] of TColor =
+
+         (// No valid  Yes
+          ((CL_BRER, clCream),   // no req  no empty
+           (clWhite, clWhite)),  // no req  empty
+
+          ((CL_BRER, clCream),  // req    no empty
+           (CL_BRER, CL_BRER))   // req   empty
+          );
 
          FONT_TYPE_COLOR: array [XmlSchemaContentType] of TColor =
 
@@ -53,78 +67,89 @@ type
     function GetItemName: string;
   protected
     FType: IXmlSchemaType;
-//    procedure SetTypeTree(Required: Boolean);
+    procedure SetTypeTree(Required: Boolean);
+    function GetContent: XmlSchemaContentType;
+    function GetValid: Boolean; virtual;
+    function GetRequired: boolean; virtual; abstract;
     function GetEmpty: Boolean; virtual; abstract;
+    function GetHasDefault: Boolean; virtual; abstract;
+    function GetHasFixed: Boolean; virtual; abstract;
+    function GetDefaultValue():string; virtual; abstract;
+    function GetFixedValue():string; virtual; abstract;
     function GetTypeAnnotation(): string;
+    function GetType: IXmlSchemaType; virtual;
+    procedure UpdateValueView(Tree: TBaseVirtualTree; ColumnData: TColumnData); virtual;
     function GetComplex: IXmlSchemaComplexType;
     function GetSimple: IXmlSchemaSimpleType;
-    function GetType: IXmlSchemaType; virtual;
   public
     constructor Create(AOwner: PVirtualNode; ANode: IInterface); override;
-    procedure Empty(); virtual; abstract;
+    function GetAnnotation: string; override;
+    procedure Empty(Tree: TBaseVirtualTree); virtual;
     function FindValueEditor: TDataEditorClass; virtual;
     property TypeName: string read getTypeName;
     property IsNoNameType: Boolean read GetIsNoNameType;
     property Name: string  read GetItemName;
     property SchemaType: IXmlSchemaType read GetType implements IXmlSchemaType;
+    property DefaultValue: string read GetDefaultValue;
+    property FixedValue: string read GetFixedValue;
+    property HasDefault: boolean read GetHasDefault;
+    property HasFixed: boolean read GetHasFixed;
     property IsEmpty: Boolean read GetEmpty;
+    property IsValid: Boolean read GetValid;
+    property IsRequired: boolean read GetRequired;
+    property Content: XmlSchemaContentType read GetContent;
     property Simple: IXmlSchemaSimpleType read GetSimple;
     property Complex: IXmlSchemaComplexType read GetComplex;
     class property CType: TIndexColumn read FCType write FCType;
     class property CValue: TIndexColumn read FCValue write FCValue;
   end;
 
-  TAttrData = class sealed(TTypedTreeData)
+  TAttrData = class sealed(TTypedTreeData, IXmlSchemaAttribute)
   protected
+    function GetDefaultValue():string; override;
+    function GetFixedValue():string; override;
+    function GetHasDefault: boolean; override;
+    function GetHasFixed: boolean; override;
+    function GetRequired: boolean; override;
     function GetEmpty: Boolean; override;
     class function New(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IInterface; Ins: Boolean = False): PVirtualNode; override;
   private
     function GetAttr: IXmlSchemaAttribute;
     function GetProhibited: boolean;
-    function GetRequired: boolean;
-    function GetHasDefault: boolean;
-    function GetHasFixed: boolean;
   public
     constructor Create(AOwner: PVirtualNode; ANode: IInterface); override;
-    procedure Empty(); override;
-    property Attr: IXmlSchemaAttribute read GetAttr;
-    property HasDefault: boolean read GetHasDefault;
-    property HasFixed: boolean read GetHasFixed;
-    property Required: boolean read GetRequired;
+    property Attr: IXmlSchemaAttribute read GetAttr implements IXmlSchemaAttribute;
     property Prohibited: boolean read GetProhibited;
-//    property Simple;
   end;
 
   TElemData = class(TTypedTreeData, IXmlSchemaElement, IXmlSchemaParticle)
   protected
    type
     TElems = TArray<TElemData>;
-    function GetElem: IXmlSchemaElement; virtual;
+    function GetDefaultValue():string; override;
+    function GetFixedValue():string; override;
+    function GetHasDefault: boolean; override;
+    function GetHasFixed: boolean; override;
+    function GetRequired: boolean; override;
     function GetEmpty: Boolean; override;
+    function GetChildEmpty: Boolean;
+    function GetElem: IXmlSchemaElement; virtual;
     function GetManyExistsItems: TElems;
     class function New(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IInterface; Ins: Boolean = False): PVirtualNode; override;
   private
     FChildAddToTree: Boolean;
     function GetPaticle: IXmlSchemaParticle;
-    function GetContent: XmlSchemaContentType;
     function GetManyExists: Boolean;
-    function GetMastExists: Boolean;
     function GetHasChild: Boolean;
   public
     procedure OnClick(Sender: TBaseVirtualTree; const HitInfo: THitInfo); override;
     procedure AfterConstruction; override;
-    function GetAnnotation: string; override;
-    procedure Empty(); override;
+    procedure Empty(Tree: TBaseVirtualTree); override;
     property Elem: IXmlSchemaElement read GetElem implements IXmlSchemaElement;
     property Paticle: IXmlSchemaParticle read GetPaticle implements IXmlSchemaParticle;
-    property MastExists: Boolean read GetMastExists;
     property ManyExists: Boolean read GetManyExists;
-//    property ManyExistsItems: TArray<TElemData> read GetManyExistsItems;
-    property Content: XmlSchemaContentType read GetContent;
     property HasChild: Boolean read GetHasChild;
     property ChildAddToTree: Boolean read FChildAddToTree write FChildAddToTree;
-//    property Simple;
-//    property Complex;
   end;
 
   TChoiceElem = class sealed(TElemData, IXmlSchemaChoice)
@@ -291,6 +316,27 @@ begin
   inherited;
   if Supports(FNode, IXmlSchemaAttribute, a) then FType := a.AttributeSchemaType as IXmlSchemaType
   else if Supports(FNode, IXmlSchemaElement, e) then FType := e.ElementSchemaType;
+
+  Columns[CValue].UpdateViewDataFunc := UpdateValueView;
+end;
+procedure TTypedTreeData.UpdateValueView(Tree: TBaseVirtualTree; ColumnData: TColumnData);
+begin
+  ColumnData.BrashColor := BRUSH_VAL_COLOR[IsRequired, IsEmpty, IsValid];
+  Tree.InvalidateNode(ColumnData.Owner);
+  if Assigned(ColumnData.Owner.Parent) then
+   begin
+    var p := GetTD(ColumnData.Owner.Parent);
+    if  p is TTypedTreeData then (p as TTypedTreeData).UpdateValueView(Tree, p.Columns[ColumnData.Index]);
+   end;
+end;
+procedure TTypedTreeData.Empty(Tree: TBaseVirtualTree);
+begin
+  if not HasFixed then
+   if HasDefault then Columns[CValue].Value := DefaultValue
+   else Columns[CValue].Value := '';
+  Columns[CValue].UpdateViewData(Tree);
+  Columns[CTree].UpdateViewData(Tree);
+  Tree.InvalidateNode(FOwner);
 end;
 
 function TTypedTreeData.FindValueEditor: TDataEditorClass;
@@ -301,6 +347,12 @@ end;
 function TTypedTreeData.GetComplex: IXmlSchemaComplexType;
 begin
   Supports(SchemaType, IXmlSchemaComplexType, Result);
+end;
+
+function TTypedTreeData.GetContent: XmlSchemaContentType;
+begin
+  if Assigned(Simple) then Result := scTextOnly
+  else Result := Complex.ContentType;
 end;
 
 function TTypedTreeData.GetIsNoNameType: Boolean;
@@ -334,22 +386,34 @@ begin
   if Result = '' then Result := 'noname';
 end;
 
-//procedure TTypedTreeData.SetTypeTree(Required: Boolean);
-//begin
-//  var cm := 'simple';
-//  if Assigned(Complex) then
-//   begin
-//    if not Complex.SimpleContentModel then cm := 'complex';
-//    cm :=  CtToString(Complex.ContentTypeParticle) + ' ' + cm;
-//   end;
-//  var s := Format('%s %s  %s%s',[TypeName, TRttiEnumerationType.GetName(FType.TypeCode), cm, DmToString(FType.DerivedBy)]);
-//  if Integer(FType.Variety) >= 0 then
-//  Columns[CType].Value := Format('%s %s %s',[s, TRttiEnumerationType.GetName(FType.Variety),
-//                                               TRttiEnumerationType.GetName(FType.TokenizedType)])
-//  else Columns[CType].Value := s;
-//  if IsNoNameType then Columns[CType].FontColor := $404080;
-//end;
+function TTypedTreeData.GetValid: Boolean;
+begin
+  var s := simple;
+  Result := Assigned(s);
+  if Result then Result := Columns[CValue].IsValid;
+end;
 
+function TTypedTreeData.GetAnnotation: string;
+begin
+  Result := inherited;
+  if Result = '' then Result := GetTypeAnnotation
+end;
+
+procedure TTypedTreeData.SetTypeTree(Required: Boolean);
+begin
+  var cm := 'simple';
+  if Assigned(Complex) then
+   begin
+    if not Complex.SimpleContentModel then cm := 'complex';
+    cm :=  CtToString(Complex.ContentTypeParticle) + ' ' + cm;
+   end;
+  var s := Format('%s %s  %s%s',[TypeName, TRttiEnumerationType.GetName(FType.TypeCode), cm, DmToString(FType.DerivedBy)]);
+  if Integer(FType.Variety) >= 0 then
+  Columns[CType+1].Value := Format('%s %s %s',[s, TRttiEnumerationType.GetName(FType.Variety),
+                                               TRttiEnumerationType.GetName(FType.TokenizedType)])
+  else Columns[CType+1].Value := s;
+  if IsNoNameType then Columns[CType+1].FontColor := $404080;
+end;
 {$ENDREGION}
 
 {$REGION 'TAttrData'}
@@ -359,10 +423,11 @@ constructor TAttrData.Create(AOwner: PVirtualNode; ANode: IInterface);
 begin
   inherited;
   Columns[CTree].Value := string(Attr.QualifiedName.Name);
-  Columns[CTree].FontColor := FONT_TREE_COLOR[Required, False];
+  Columns[CTree].FontColor := FONT_TREE_COLOR[IsRequired, False];
   Columns[CType].FontColor := Columns[CTree].FontColor;
 //  Columns[COLL_UOM].FontColor := Columns[CTree].FontColor;
   Columns[CTree].ImageIndex := 5;
+  Columns[CValue].EditType := FindValueEditor();
   var s := string(SchemaType.QualifiedName.Name);
   if s ='' then
    begin
@@ -376,19 +441,25 @@ begin
     Columns[CValue].Value := string(Attr.FixedValue);
     Columns[CValue].EditType := nil;
    end
-  else if Required then
+  else if IsRequired then
    begin
     Columns[CValue].BrashColor := $E0E0FF;
     Columns[CTree].FontStyles := [fsBold];
 //    Columns[COLL_TYPE].ImageIndex := 5;
    end;
-  Columns[CValue].EditType := FindValueEditor;
-//  SetTypeTree(False);
+  SetTypeTree(False);
 end;
 
-procedure TAttrData.Empty;
+function TAttrData.GetEmpty: Boolean;
 begin
+  if HasFixed then Exit(True)
+  else if HasDefault then Exit(SameStr(string(Columns[CValue].Value), DefaultValue))
+       else Exit(SameStr(string(Columns[CValue].Value).Trim, ''));
+end;
 
+function TAttrData.GetFixedValue: string;
+begin
+  Result := string(Attr.FixedValue);
 end;
 
 function TAttrData.GetAttr: IXmlSchemaAttribute;
@@ -396,9 +467,9 @@ begin
   Result := FNode as IXmlSchemaAttribute;
 end;
 
-function TAttrData.GetEmpty: Boolean;
+function TAttrData.GetDefaultValue: string;
 begin
-  Result := Columns[CValue].Value = '';
+  Result := string(Attr.DefaultValue);
 end;
 
 function TAttrData.GetHasDefault: boolean;
@@ -435,7 +506,7 @@ begin
   inherited AfterConstruction;
   Columns[CTree].Value := string(Elem.QualifiedName.Name);
   Columns[CTree].FontStyles := [fsBold];
-  Columns[CTree].FontColor := FONT_TREE_COLOR[MastExists, ManyExists];
+  Columns[CTree].FontColor := FONT_TREE_COLOR[IsRequired, ManyExists];
   if Content = scTextOnly then Columns[CValue].EditType := FindValueEditor;
   if ManyExists then
    begin
@@ -454,29 +525,37 @@ begin
      Columns[CTree].ExpandedImageIndex := 2;
     end;
 
-  if MastExists and (Content = scTextOnly) then Columns[CValue].BrashColor := $E0E0FF;
+  if IsRequired and (Content = scTextOnly) then Columns[CValue].BrashColor := $E0E0FF;
 
   Columns[CType].Value := TypeName;
-//  SetTypeTree(False);
+  SetTypeTree(False);
   Columns[CType].FontColor := FONT_TYPE_COLOR[Content];
 //  if MastExists then Columns[COLL_TYPE].ImageIndex := 5;
 end;
 
-procedure TElemData.Empty;
+procedure TElemData.Empty(Tree: TBaseVirtualTree);
 begin
-
+  Columns[CValue].Value := '';
+  Tree.DeleteChildren(FOwner);
+  ChildAddToTree := False;
+  inherited;
 end;
 
-function TElemData.GetAnnotation: string;
+function TElemData.GetChildEmpty: Boolean;
 begin
-  Result := inherited;
-  if Result = '' then Result := GetTypeAnnotation
+  var c := FOwner.FirstChild;
+  Result := True;
+  while Result and Assigned(c) do
+   begin
+    var d := GetTD(c);
+    if d is TTypedTreeData then Result := Result and (d as TTypedTreeData).IsEmpty;
+    c := c.NextSibling;
+   end;
 end;
 
-function TElemData.GetContent: XmlSchemaContentType;
+function TElemData.GetDefaultValue: string;
 begin
-  if Assigned(Simple) then Result := scTextOnly
-  else Result := Complex.ContentType;
+  Result := string(Elem.DefaultValue)
 end;
 
 function TElemData.GetElem: IXmlSchemaElement;
@@ -487,11 +566,27 @@ end;
 function TElemData.GetEmpty: Boolean;
 begin
   Result := Columns[CValue].Value = '';
+  if HasChild and Result then Result := GetChildEmpty;
+end;
+
+function TElemData.GetFixedValue: string;
+begin
+  Result := string(Elem.FixedValue)
 end;
 
 function TElemData.GetHasChild: Boolean;
 begin
   Result := (Content = scElementOnly) or (Assigned(Complex) and (Complex.AttributeUses.Count > 0));
+end;
+
+function TElemData.GetHasDefault: boolean;
+begin
+  Result := Assigned(Elem.DefaultValue)
+end;
+
+function TElemData.GetHasFixed: boolean;
+begin
+  Result := Assigned(Elem.FixedValue)
 end;
 
 function TElemData.GetManyExists: Boolean;
@@ -523,7 +618,7 @@ begin
   Result := Res;
 end;
 
-function TElemData.GetMastExists: Boolean;
+function TElemData.GetRequired: Boolean;
 begin
   Result := Paticle.MinOccurs > 0;
 end;
