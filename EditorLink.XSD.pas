@@ -16,7 +16,10 @@ such as daylight savings time.
 //YYYY-MM-DDThh:mm:ssZ[+/-]hh:mm
 type
   TXSDEditLink = class(TTreeEditLink)
+  private
+    function GetValidator: IXmlSchemaValidator;
   public
+    property Validator: IXmlSchemaValidator read GetValidator;
     class function GetEditorType(SchemaType: IXmlSchemaType): TDataEditorClass; virtual;
   end;
   TXSDEditLinkClass = class of TXSDEditLink;
@@ -156,6 +159,11 @@ begin
   Result := Res;
 end;
 
+function TXSDEditLink.GetValidator: IXmlSchemaValidator;
+begin
+  Supports(FTree.Parent, IXmlSchemaValidator,  Result);
+end;
+
 { TPickStringEditorBase }
 
 constructor TPickStringEditorBase.Create(AOwner: TTreeEditLink; Value: TColumnData);
@@ -205,11 +213,7 @@ begin
     FNewValue := pse.Text;
     FValue.FontColor := clGreen;
    end;
-  if FNewValue <> FValue.Value then
-   begin
-    FOwner.FTree.DeleteChildren(FOwner.FNode);
-    FAbsElem.ChildAddToTree := False;
-   end;
+  if FNewValue <> FValue.Value then with FAbsElem do Empty(Tree);
 end;
 
 { TChoiceTypeEditor }
@@ -233,12 +237,7 @@ begin
   if pse.ItemIndex < 0 then pse.ItemIndex := 0;
   FcElem.Current := pse.ItemIndex;
   FNewValue := pse.Text;
-  if FNewValue <> FValue.Value then with FcElem do
-   begin
-    Tree.DeleteChildren(FOwner.FNode);
-    ChildAddToTree := False;
-    FValue.Value := string(Elem.QualifiedName.Name);
-   end;
+  if FNewValue <> FValue.Value then with FcElem do Empty(Tree);
 end;
 
 { TFacetEnumEditor }
@@ -268,7 +267,7 @@ begin
     begin
       Visible := False;
       Parent := Tree;
-      Format := 'yyyy-MM-dd HH:mm:ss';
+      Format := 'yyyy-MM-dd HH:mm';//:ss';
       try
        if Value.Value = '' then DateTime := 0
        else DateTime := XMLTimeToDateTime(Value.Value);

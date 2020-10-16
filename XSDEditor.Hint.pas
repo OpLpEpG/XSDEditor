@@ -116,13 +116,15 @@ procedure THintAdapter.DrawHint(Sender: TBaseVirtualTree; HintCanvas: TCanvas; N
  var
   top :Integer;
 begin
-  if not (Column in [COLL_TREE, COLL_TYPE]) then Exit;
+  if not (Column in [COLL_TREE, COLL_VAL, COLL_TYPE]) then Exit;
   //
   InflateRect(R, -1, -1); // Fixes missing border when VCL styles are used
-  GradientFillCanvas(HintCanvas, clInfoBk, GetHighLightColor(clInfoBk), R, gdVertical);
+  if Column = COLL_VAL then
+       GradientFillCanvas(HintCanvas, clWebLightPink, GetHighLightColor(clWebLightPink), R, gdVertical)
+  else GradientFillCanvas(HintCanvas, clInfoBk, GetHighLightColor(clInfoBk), R, gdVertical);
   InflateRect(R, -4, -4); // Fixes missing border when VCL styles are used
   top := R.Top;
-  if Column = COLL_TREE then
+  if Column <> COLL_TYPE then
        HintCanvas.TextRect(R, outText, [tfWordBreak])
   else for var s in typeText do
    begin
@@ -167,7 +169,7 @@ procedure THintAdapter.GetHintSize(Sender: TBaseVirtualTree; Node: PVirtualNode;
  var
   nd: TTypedTreeData;
 begin
-  if not (Column in [COLL_TREE, COLL_TYPE]) then Exit;
+  if not (Column in [COLL_TREE, COLL_VAL, COLL_TYPE]) then Exit;
   var MAXCLIENTW := Form.Width div 2 - 10;
   if GetTD(Node) is TTypedTreeData then  nd := GetTD(Node) as TTypedTreeData
   else Exit;
@@ -177,7 +179,7 @@ begin
      begin
       outText := '';
       var tmpWidth := 0;
-      for var ann in GetAnnotationEx(nd as TTypedTreeData, true, Form.IgnoreAnnotations) do
+      for var ann in GetAnnotationEx(nd, true, Form.IgnoreAnnotations) do
        begin
         var w := Form.Canvas.TextWidth(ann);
         if W > tmpWidth then
@@ -195,6 +197,19 @@ begin
         InflateRect(R, 5, 5);
        end;
      end;
+    COLL_VAL:
+    begin
+     outText := nd.Columns[COLL_VAL].ValidateErrorMsg;
+      if outText = '' then R := R.Empty
+      else
+       begin
+        R.Width := Form.Canvas.TextWidth(outText);
+        if R.Width > MAXCLIENTW then R.Width := MAXCLIENTW;
+        R.Height := -Screen.HintFont.Height;
+        Form.Canvas.TextRect(R, outText, [tfWordBreak, tfCalcRect]);
+        InflateRect(R, 5, 5);
+       end;
+    end;
     COLL_TYPE:
      begin
       typeText := [];

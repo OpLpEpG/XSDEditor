@@ -480,15 +480,15 @@ type
         ///
         /// Сводка:
         ///     Допустимость XML-элемента неизвестен.
-        NotKnown = 0,
+        svNotKnown = 0,
         ///
         /// Сводка:
         ///     Элемент XML является допустимым.
-        Valid = 1,
+        svValid = 1,
         ///
         /// Сводка:
         ///     Недопустимый элемент XML.
-        Invalid = 2
+        svInvalid = 2
     );
 
     ///
@@ -651,6 +651,12 @@ type
  TCsArray = array[0..5000] of TCSharp;
 
 {$REGION 'misc'}
+ ICsString = interface
+ ['{013E4993-B90F-444C-A861-3C7118DC0560}']
+   function getValue(): PChar; safecall;
+   property Value: PChar read getValue;
+ end;
+
  IXmlQualifiedName = interface
  ['{4B538C5E-DC77-437C-893B-97488A82E509}']
    function getIsEmpty(): Boolean; safecall;
@@ -681,10 +687,10 @@ type
   private
     FEnum: IXMLEnumeraror;
     FFunc: TGetXml<T>;
-    function DoGetCurrent: T;
+    function DoGetCurrent: T; inline;
   public
     property Current: T read DoGetCurrent;
-    function MoveNext: Boolean;
+    function MoveNext: Boolean; inline;
     function GetEnumerator: TXEnum<T>;
     constructor Create(Enum: IXMLEnumerable; func: TGetXml<T>);
   end;
@@ -718,7 +724,7 @@ type
         ///
         /// Возврат:
         ///     Исходное расположение (URI) для файла.
-   function SourceUri(): PChar; safecall;
+   function GetSourceUri(): PChar; safecall;
         ///
         /// Сводка:
         ///     Возвращает или задает родительский элемент объекта System.Xml.Schema.XmlSchemaObject.
@@ -736,6 +742,7 @@ type
         ///
         ///XmlSerializerNamespaces Namespaces { get; set; }
    procedure GetNamespaces(out Namespaces: PCsArray; out Count: Integer); safecall;
+   property  SourceUri: PChar read GetSourceUri;
  end;
 
  IXmlSchemaAnnotated = interface // abstract IXmlSchemaObject
@@ -1501,12 +1508,15 @@ end;
  {$ENDREGION XmlSchemaObject}
 
 {$REGION 'Validator'}
+ TXMLValidatorCallBack = TCSharp;
  IXMLValidatorCallBack = interface
-  ['{AE7AF832-8353-48DC-966D-E6FE7737F171}']
-  procedure ValidationCallback(SeverityType: XmlSeverityType; ErrorMessage: PChar); safecall;
+ ['{AE7AF832-8353-48DC-966D-E6FE7737F171}']
+    procedure ValidationCallback(SeverityType: XmlSeverityType; ErrorMessage: PChar); safecall;
+    function GetSelf(): TXMLValidatorCallBack; safecall;
+    procedure SetSelf(s: TXMLValidatorCallBack); safecall;
  end;
 
- IXmlNamespaceManager = interface
+ IXmlNamespaceManager = interface // IXMLEnumerable prefixes
  ['{79CED196-FC1C-4032-8CB8-A6CD1E6C305C}']
   ///
   /// Сводка:
@@ -1554,6 +1564,43 @@ end;
   ///     Соответствующий префикс. Если нет сопоставленного префикса, данный метод возвращает
   ///     String.Empty. Если указано значение null, затем null возвращается.
   function LookupPrefix(uri: PChar):PChar; safecall;
+        ///
+        /// Сводка:
+        ///     Извлекает из стека область видимости пространства имен.
+        ///
+        /// Возврат:
+        ///     true Если остались области пространств имен в стеке; false Если отсутствуют дополнительные
+        ///     пространства имен для раскрытия.
+  function PopScope(): Boolean; safecall;
+        ///
+        /// Сводка:
+        ///     Заносит область видимости пространства имен в стек.
+  procedure PushScope(); safecall;
+        ///
+        /// Сводка:
+        ///     Добавляет заданное пространство имен в коллекцию.
+        ///
+        /// Параметры:
+        ///   prefix:
+        ///     Префикс, который требуется связать с добавляемым пространством имен. Используйте
+        ///     String.Empty для добавления пространства имен по умолчанию. ПримечаниеЕсли System.Xml.XmlNamespaceManager
+        ///     будет использоваться для разрешения пространств имен в выражении языка XML Path
+        ///     (XPath), должен быть указан префикс. Если выражение XPath не содержит префикс,
+        ///     предполагается, что универсальным кодом ресурса (URI) для пространства имен является
+        ///     пустое пространство имен. Дополнительные сведения о выражениях XPath и System.Xml.XmlNamespaceManager,
+        ///     обратитесь к System.Xml.XmlNode.SelectNodes(System.String) и System.Xml.XPath.XPathExpression.SetContext(System.Xml.XmlNamespaceManager)
+        ///     методы.
+        ///
+        ///   uri:
+        ///     Добавляемое пространство имен.
+        ///
+        /// Исключения:
+        ///   T:System.ArgumentException:
+        ///     Значение для prefix «xml» или «xmlns».
+        ///
+        ///   T:System.ArgumentNullException:
+        ///     Значение для prefix или uri — null.
+  procedure AddNamespace(prefix: PChar; uri: PChar); safecall;
  end;
 
  IXmlSchemaInfo = interface
@@ -2242,7 +2289,7 @@ end;
   ///     System.Xml.XmlReader Метод был вызван до завершения предыдущей асинхронной операции.
   ///     В этом случае System.InvalidOperationException исключение с сообщением «асинхронная
   ///     операция уже выполняется.»
-  procedure ReadStartElement();safecall;
+  procedure ReadStartElement(); safecall;
   ///
   /// Сводка:
   ///     Возвращает новый XmlReader экземпляр, который может использоваться для считывания
@@ -2281,7 +2328,6 @@ end;
   property NamespaceURI: PChar read getNamespaceURI;
   property ReadState: ReadState read getReadState;
   property EOF: Boolean read getEOF;
-
  end;
 
  IXmlSchemaValidator = interface
@@ -2291,6 +2337,7 @@ end;
   ///     System.Xml.Schema.ValidationEventHandler Получает предупреждений проверки схемы
   ///     и ошибки, возникшие при проверке схемы.
   procedure AddValidationEventHandler(v: IXMLValidatorCallBack); safecall;
+  procedure DelValidationEventHandler(v: IXMLValidatorCallBack); safecall;
   ///
   /// Сводка:
   ///     Завершает проверку и проверяет ограничения идентификации для всего документа
@@ -2476,8 +2523,7 @@ end;
   ///     Overload:System.Xml.Schema.XmlSchemaValidator.ValidateElement Не был вызван метод
   ///     в правильной последовательности. Например Overload:System.Xml.Schema.XmlSchemaValidator.ValidateElement
   ///     метод вызывается после вызова метода Overload:System.Xml.Schema.XmlSchemaValidator.ValidateAttribute.
-  procedure ValidateElement(localName: PChar; namespaceUri: PChar; out schemaInfo: IXmlSchemaInfo;
-  xsiType, xsiNil, xsiSchemaLocation, xsiNoNamespaceSchemaLocation: PChar); safecall; overload;
+  procedure ValidateElement(localName: PChar; namespaceUri: PChar; out schemaInfo: IXmlSchemaInfo;xsiType, xsiNil, xsiSchemaLocation, xsiNoNamespaceSchemaLocation: PChar); safecall; overload;
   ///
   /// Сводка:
   ///     Проверяет, является ли текстовое содержимое указанного элемента допустимым для
@@ -2602,7 +2648,8 @@ end;
 
  IXmlSchemaSet = interface
   ['{CEAD7A91-2DAC-44E1-8425-F32E1A23DCE3}']
-  function Namespace(): IXmlNamespaceManager; safecall;
+  /// создает новый пустой NamespaceManager
+  function CreateNamespace(): IXmlNamespaceManager; safecall;
   ///
   /// Сводка:
   ///     Получает все глобальные атрибуты в определении схемы XML схем языка XSD в System.Xml.Schema.XmlSchemaSet.
@@ -2642,6 +2689,7 @@ end;
   ///     Указывает обработчик событий, получающий сведения об ошибках проверки схем языка
   ///     определения схем XML (XSD).
   procedure AddValidationEventHandler(v: IXMLValidatorCallBack); safecall;
+  procedure DelValidationEventHandler(v: IXMLValidatorCallBack); safecall;
   ///
   /// Сводка:
   ///     Повторная обработка схему языка XSD определения схемы XML, который уже существует
@@ -2693,13 +2741,16 @@ end;
   ///     возвращается объект.
   function Schemas(targetNamespace: PChar): IXMLEnumerable; safecall; overload;
   procedure Validate(FileName: PChar); safecall;
-  function Validator(FileName: PChar; out reader: IXmlReader): IXmlSchemaValidator; safecall;
+  function Validator(FileName: PChar; out reader: IXmlReader): IXmlSchemaValidator; safecall;overload;
+  function Validator(ns: IXmlNamespaceManager): IXmlSchemaValidator; safecall;overload;
   function DerivedFrom(baseType: IXmlSchemaType): IXmlSchemaObjectCollection; safecall;
  end;
 {$ENDREGION}
 
 // functions
 procedure GetXmlSchemaSet(out XmlSchemaSet: IXmlSchemaSet); stdcall; external 'cstopas.dll';
+procedure GetCsString(obj: TCSharp;
+                                out intf: ICsString); stdcall; external 'cstopas.dll';
 procedure GetXmlQualifiedName(obj: TCSharp;
                                 out intf: IXmlQualifiedName); stdcall; external 'cstopas.dll';
 procedure GetXmlSchemaObject(obj: TCSharp;
@@ -2727,6 +2778,7 @@ procedure GetXmlSchemaExternal(obj: TCSharp;
 procedure GetXmlSchemaFacet(obj: TCSharp;
                                 out intf: IXmlSchemaFacet); stdcall; external 'cstopas.dll';
 
+function CsStrings(Enum: IInterface): TXEnum<ICsString>;
 function XObjects(Enum: IInterface): TXEnum<IXmlSchemaObject>;
 function XParticles(Enum: IInterface): TXEnum<IXmlSchemaParticle>;
 function XIncludes(Enum: IInterface): TXEnum<IXmlSchemaExternal>;
@@ -2742,6 +2794,10 @@ function XFacets(Enum: IInterface): TXEnum<IXmlSchemaFacet>;
 
 implementation
 
+function CsStrings(Enum: IInterface): TXEnum<ICsString>;
+begin
+  Result := TXEnum<ICsString>.Create(Enum as IXMLEnumerable, GetCsString);
+end;
 function XFacets(Enum: IInterface): TXEnum<IXmlSchemaFacet>;
 begin
   Result := TXEnum<IXmlSchemaFacet>.Create(Enum as IXMLEnumerable, GetXmlSchemaFacet);

@@ -10,17 +10,16 @@ object FormXSD: TFormXSD
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
+  Menu = mm
   OldCreateOrder = False
   Position = poScreenCenter
-  OnClose = FormClose
-  OnCreate = FormCreate
   PixelsPerInch = 96
   TextHeight = 13
   object Tree: TVirtualStringTree
     Left = 0
     Top = 0
     Width = 775
-    Height = 679
+    Height = 660
     Align = alClient
     BorderStyle = bsNone
     ClipboardFormats.Strings = (
@@ -40,6 +39,7 @@ object FormXSD: TFormXSD
     Font.Name = 'Tahoma'
     Font.Style = []
     Header.AutoSizeIndex = 3
+    Header.Height = 18
     Header.Options = [hoAutoResize, hoColumnResize, hoDrag, hoShowSortGlyphs, hoVisible, hoAutoSpring]
     HintMode = hmHint
     Images = TreeImages
@@ -72,6 +72,7 @@ object FormXSD: TFormXSD
     OnInitNode = TreeInitNode
     OnMeasureItem = TreeMeasureItem
     OnNodeClick = TreeNodeClick
+    ExplicitHeight = 679
     Columns = <
       item
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coAutoSpring, coAllowFocus]
@@ -97,6 +98,16 @@ object FormXSD: TFormXSD
         Text = 'uom'
         Width = 10
       end>
+  end
+  object sb: TStatusBar
+    Left = 0
+    Top = 660
+    Width = 775
+    Height = 19
+    Panels = <>
+    ExplicitLeft = 416
+    ExplicitTop = 664
+    ExplicitWidth = 0
   end
   object TreeImages: TImageList
     Height = 12
@@ -1468,5 +1479,101 @@ object FormXSD: TFormXSD
       Caption = 'Clear'
       OnClick = EmptyClick
     end
+  end
+  object mm: TMainMenu
+    Left = 160
+    Top = 32
+    object newfile: TMenuItem
+      Caption = 'file'
+      object menuNew: TMenuItem
+        Caption = 'new'
+        OnClick = menuNewClick
+      end
+      object menuOpen: TMenuItem
+        Caption = 'open...'
+        OnClick = menuOpenClick
+      end
+      object N1: TMenuItem
+        Caption = '-'
+      end
+      object save1: TMenuItem
+        Caption = 'save'
+        OnClick = menuSaveClick
+      end
+    end
+    object schema: TMenuItem
+      Caption = 'schema'
+      object menuSchDir: TMenuItem
+        Caption = 'schema work dir...'
+        OnClick = menuSchDirClick
+      end
+      object menuSchOpen: TMenuItem
+        Caption = 'open...'
+        OnClick = menuSchOpenClick
+      end
+    end
+    object namespace: TMenuItem
+      Caption = 'namespace'
+      object menuNameSpace: TMenuItem
+        Caption = 'edit...'
+        OnClick = menuNameSpaceClick
+      end
+    end
+  end
+  object SelectDir: TJvSelectDirectory
+    Options = []
+    Left = 248
+    Top = 32
+  end
+  object Storage: TJvFormStorage
+    AppStorage = XMLFileStorage
+    AppStoragePath = '%FORM_NAME%\'
+    BeforeSavePlacement = StorageBeforeSavePlacement
+    AfterRestorePlacement = StorageAfterRestorePlacement
+    StoredProps.Strings = (
+      'Tree.Width'
+      'Tree.Height')
+    StoredValues = <
+      item
+        Name = 'COLL_TREE'
+        Value = 0
+      end
+      item
+        Name = 'COLL_VAL'
+        Value = 0
+      end
+      item
+        Name = 'COLL_TYPE'
+        Value = 0
+      end
+      item
+        Name = 'COLL_UOM'
+        Value = 0
+      end
+      item
+        Name = 'SCHEMA_DIR'
+        Value = #39#39
+      end
+      item
+        Name = 'SCHEMA_FILE'
+        Value = 'well.xsd'
+      end>
+    Left = 320
+    Top = 32
+  end
+  object XMLFileStorage: TJvAppXMLFileStorage
+    StorageOptions.BooleanStringTrueValues = 'TRUE, YES, Y'
+    StorageOptions.BooleanStringFalseValues = 'FALSE, NO, N'
+    StorageOptions.InvalidCharReplacement = '_'
+    FileName = 'config.xml'
+    RootNodeName = 'Configuration'
+    SubStorages = <>
+    Left = 392
+    Top = 32
+  end
+  object OpenFile: TOpenTextFileDialog
+    Options = [ofReadOnly, ofPathMustExist, ofFileMustExist, ofEnableSizing]
+    Left = 248
+    Top = 96
   end
 end

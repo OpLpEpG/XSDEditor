@@ -26,7 +26,9 @@ type
    property Link: TTreeEditLink read FOwner;
   end;
   TDataEditorClass = class of TDataEditor;
-
+  ///
+  ///  стандартные  TDataEditor`ы
+  ///
   TStringEditor = class(TDataEditor)
    constructor Create(AOwner: TTreeEditLink; Value: TColumnData); override;
   end;
@@ -50,17 +52,18 @@ type
   TFloatEditor = class(TjvNumEditEditor)
    constructor Create(AOwner: TTreeEditLink; Val: TColumnData); override;
   end;
+  ////////////////////////////////////////////////
 
   TColumnDataValidator = class abstract(TInterfacedObject)
   public
+   FValidateErrorMsg: string;
    FEditor: TDataEditor;
-   FData: TColumnData;
+   FColumnData: TColumnData;
    constructor Create(AEditor: TDataEditor; AData: TColumnData); virtual;
-   function CheckValid: Boolean; virtual; abstract;
+   procedure Validate; virtual; abstract;
   end;
   TValidatorClass = class of TColumnDataValidator;
 
-  TUpdateViewData = procedure (Tree: TBaseVirtualTree; ColumnData: TColumnData) of object;
   TColumnData = class sealed (TInterfacedObject)
   private
     procedure SetImageIndex(const Value: Integer);
@@ -68,9 +71,24 @@ type
   public
     Owner: PVirtualNode;
     Index: Integer;
+    /// <remarks>
+    /// поведение дл€ получени€ Value IsValid €чейки
+    /// </remarks>
     EditType: TDataEditorClass;
+    Validator: TValidatorClass;
+    /// <remarks>
+    /// значение €чейки
+    /// </remarks>
     Value: string;
     IsValid: Boolean;
+    ValidateErrorMsg: string;
+    /// <remarks>
+    ///  ссылка на функцию обновлени€ визуальных атрибутов после изменени€ Value, IsValid
+    /// </remarks>
+    UpdateViewDataFunc: procedure of object;
+    /// <remarks>
+    /// визуальные атрибуты €чейки
+    /// </remarks>
     FontStyles: TFontStyles;
     FontColor: TColor;
     BrashColor: TColor;
@@ -80,11 +98,15 @@ type
     StateGosted: Boolean;
     FStateImageIndex: Integer;
     StatexpandedImageIndex: Integer;
-    Validator: TValidatorClass;
-    UpdateViewDataFunc: TUpdateViewData;
+    ////////////////////////////////
     constructor Create(AOwner: PVirtualNode; AIndex: Integer);
     destructor Destroy; override;
-    procedure UpdateViewData(Tree: TBaseVirtualTree);
+    /// <remarks>
+    ///  ‘ункци€ обновлени€ визуальных атрибутов при изменении Value, IsValid
+    ///          и перерисовка €чейки в Tree: "Tree.InvalidateNode(node)".
+    ///  ¬озможен вызов UpdateViewData родител€.
+    /// </remarks>
+    procedure UpdateViewData(Tree: TBaseVirtualTree; UpdateParent: Boolean = True);
     property ImageIndex: Integer read FImageIndex write SetImageIndex;
     property StateImageIndex: Integer read FStateImageIndex write SetStateImageIndex;
   end;
@@ -98,12 +120,12 @@ type
   TStdData = class abstract(TInterfacedObject, IStdData)
   private
     FColumns: TArray<IInterface>;
+    function GetColumn(Index: Integer): TColumnData;
   protected
     FOwner: PVirtualNode;
   public
     constructor Create(AOwner: PVirtualNode; ColCount: Integer);
     destructor Destroy; override;
-    function GetColumn(Index: Integer): TColumnData;
     property Columns[Index: Integer]: TColumnData read GetColumn;
   end;
 
@@ -243,19 +265,17 @@ end;
 function TTreeEditLink.EndEdit: Boolean;
  var
   ColData: TColumnData;
-  Validator: TColumnDataValidator;
 begin
   Result := True;
   ColData := PStdData(FNode.GetData()).Columns[FColumn];
   FDataEdit.UpdateNewValue();
-  ColData.Value := FDataEdit.FNewValue;
+  ColData.Value := FDataEdit.NewValue;
   if Assigned(ColData.Validator) then
    begin
-    Validator := ColData.Validator.Create(FDataEdit, ColData);
-    ColData.IsValid := Validator.CheckValid;
+    var v := ColData.Validator.Create(FDataEdit, ColData);
+    v.Validate;
    end;
   ColData.UpdateViewData(FTree);
-//  FTree.InvalidateNode(FNode);
   FEdit.Hide;
   FTree.SetFocus;
 end;
@@ -294,8 +314,8 @@ begin
     Visible := False;
     Parent := Tree;
     Text := Value.Value;
-    Items.Add('False');
-    Items.Add('True');
+    Items.Add('false');
+    Items.Add('true');
     OnKeyDown := Link.EditKeyDown;
     OnKeyUp := Link.EditKeyUp;
   end;
@@ -463,9 +483,15 @@ begin
   StatexpandedImageIndex := Value;
 end;
 
-procedure TColumnData.UpdateViewData(Tree: TBaseVirtualTree);
+procedure TColumnData.UpdateViewData(Tree: TBaseVirtualTree; UpdateParent: Boolean = True);
 begin
-  if Assigned(UpdateViewDataFunc) then UpdateViewDataFunc(Tree, Self);
+  if Assigned(UpdateViewDataFunc) then UpdateViewDataFunc;
+  Tree.InvalidateNode(Owner);
+  if UpdateParent and Assigned(Owner.Parent) then
+   begin
+    var std := PStdData(Owner.Parent.GetData)^;
+    if Assigned(std) then std.Columns[Index].UpdateViewData(Tree, UpdateParent);
+   end;
 end;
 
 { TStdData }
@@ -492,7 +518,7 @@ end;
 constructor TColumnDataValidator.Create(AEditor: TDataEditor; AData: TColumnData);
 begin
   FEditor := AEditor;
-  FData := AData;
+  FColumnData := AData;
 end;
 
 end.

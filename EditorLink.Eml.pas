@@ -7,35 +7,48 @@ uses  CsToPas,
      System.RegularExpressions, System.UITypes, System.Types,
      Vcl.ExtCtrls;
 
-const EML_NS: TArray<string> =
-['eml="http://www.energistics.org/energyml/data/commonv2"',
-'gco="http://www.isotc211.org/2005/gco"',
-'gmd="http://www.isotc211.org/2005/gmd"',
-'gsr="http://www.isotc211.org/2005/gsr"',
-'gts="http://www.isotc211.org/2005/gts"',
-'gml="http://www.opengis.net/gml/3.2"',
-'xlink="http://www.w3.org/1999/xlink"',
-'xsi="http://www.w3.org/2001/XMLSchema-instance"'];
+const
+  EML_NS_WITS_DEFAULT = 'http://www.energistics.org/energyml/data/witsmlv2';
+  EML_NS: TArray<string> =
+                        ['eml="http://www.energistics.org/energyml/data/commonv2"',
+                        'gco="http://www.isotc211.org/2005/gco"',
+                        'gmd="http://www.isotc211.org/2005/gmd"',
+                        'gsr="http://www.isotc211.org/2005/gsr"',
+                        'gts="http://www.isotc211.org/2005/gts"',
+                        'gml="http://www.opengis.net/gml/3.2"',
+                        'xlink="http://www.w3.org/1999/xlink"',
+                        'xsi="http://www.w3.org/2001/XMLSchema-instance"'];
 
 //'xsi:schemaLocation="http://www.energistics.org/energyml/data/witsmlv2 file:///C:/repositories/witsml/v2.0/xsd_schemas/Well.xsd"
 
 type
- TEmlEditorLink = class (TXSDEditLink)
-  public
-    class function GetEditorType(SchemaType: IXmlSchemaType): TDataEditorClass; override;
- end;
+  TEmlEditorLink = class (TXSDEditLink)
+   public
+   class function GetEditorType(SchemaType: IXmlSchemaType): TDataEditorClass; override;
+  end;
 
-   TUuidEditor = class(TRegExEditor)
+  TUuidEditor = class(TRegExEditor)
    procedure OnRegexChange(Sender: TObject);
-    procedure OnLeftButton(Sender: TObject);
+   procedure OnLeftButton(Sender: TObject);
    constructor Create(AOwner: TTreeEditLink; Value: TColumnData); override;
    procedure SetBounds(var R: TRect); override;
   end;
 
+procedure DefaultNameSpase(m: IXmlNamespaceManager);
 implementation
 
 uses XSDEditor;
 
+
+procedure DefaultNameSpase(m: IXmlNamespaceManager);
+begin
+  m.AddNamespace('', EML_NS_WITS_DEFAULT);
+  for var a in EML_NS do
+   begin
+    var ar := a.Split(['='], TStringSplitOptions.ExcludeEmpty);
+    m.AddNamespace(PChar(ar[0]), PChar(ar[1]));
+   end;
+end;
 { TEmlEditorLink }
 
 class function TEmlEditorLink.GetEditorType(SchemaType: IXmlSchemaType): TDataEditorClass;
@@ -43,7 +56,7 @@ begin
   if SchemaType.QualifiedName.Name = 'String2000' then Result := TMemoEditor
   else if SchemaType.QualifiedName.Name = 'UuidString' then Result := TUuidEditor
   else if SchemaType.QualifiedName.Name = 'TimeStamp' then Result := TXSDateTimeEditor
-  else Result := inherited;
+  else Result := inherited GetEditorType(SchemaType);
 end;
 
 { TUuidEditor }
@@ -81,8 +94,6 @@ begin
 end;
 
 procedure TUuidEditor.SetBounds(var R: TRect);
-var
-  Dummy: Integer;
 begin
   if Edit is TButtonedEdit then
    begin

@@ -86,11 +86,8 @@ begin
 end;
 
 procedure TPickStringEditor.AdjustWidth(MaxWidth: Integer);
- var
-  mv: Integer;
 begin
   FWidth := MaxWidth;
-  mv := 0;
   FmaxItemWidth := 0;
   for var i := 0 to ItemCount-1 do FmaxItemWidth := max(FmaxItemWidth, Canvas.TextWidth(Items[i]));
   FmaxItemAnnotWidth := 0;
