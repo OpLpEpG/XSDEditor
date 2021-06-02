@@ -15,6 +15,9 @@ such as daylight savings time.
 
 //YYYY-MM-DDThh:mm:ssZ[+/-]hh:mm
 type
+  /// <remarks>
+  ///   специализированный TTreeEditLink для XSD стандартных типов
+  /// </remarks>
   TXSDEditLink = class(TTreeEditLink)
   private
     function GetValidator: IXmlSchemaValidator;
@@ -192,27 +195,19 @@ begin
   FAbsElem := GetTD(FOwner.FNode) as TAbstractElem;
   with Edit as TPickStringEditor do
    begin
-    for var ct in FAbsElem.FUserTypes do
+    for var ct in FAbsElem.UserTypes do
         AddAnnotatedItem((ct as IXmlSchemaType).QualifiedName.Name, (ct as IXmlSchemaAnnotated).GetAnnotation);
     AdjustWidth(Tree.ClientWidth);
-    ItemIndex := FAbsElem.FCurrent;
+    ItemIndex := FAbsElem.Current;
    end;
 end;
 
 procedure TAbstractTypeEditor.UpdateNewValue;
 begin
   var pse := FOwner.FEdit as TPickStringEditor;
-  FAbsElem.FCurrent := pse.ItemIndex;
-  if pse.ItemIndex < 0 then
-   begin
-    FNewValue := string(FAbsElem.SchemaType.QualifiedName.Name);
-    FValue.FontColor := clRed;
-   end
-  else
-   begin
-    FNewValue := pse.Text;
-    FValue.FontColor := clGreen;
-   end;
+  FAbsElem.Current := pse.ItemIndex;
+  if FAbsElem.Current < 0 then FNewValue := string(FAbsElem.SchemaType.QualifiedName.Name)
+  else FNewValue := pse.Text;
   if FNewValue <> FValue.Value then with FAbsElem do Empty(Tree);
 end;
 

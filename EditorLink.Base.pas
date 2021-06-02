@@ -8,6 +8,9 @@ uses
 type
   TColumnData = class;
   TTreeEditLink = class;
+  /// <remarks>
+  ///  класс обертка для TreeEditLink.Edit: TWinControl
+  /// </remarks>
   TDataEditor = class abstract(TInterfacedObject)
   private
    procedure SetEdit(const Value: TWinControl);
@@ -54,6 +57,12 @@ type
   end;
   ////////////////////////////////////////////////
 
+  /// <remarks>
+  /// проверяет новые данные AData.Value: TColumnData после редактирования FEditor: TDataEditor;
+  ///  заполняет TColumnData
+  ///    IsValid: Boolean;
+  //     ValidateErrorMsg: string;
+  /// </remarks>
   TColumnDataValidator = class abstract(TInterfacedObject)
   public
    FValidateErrorMsg: string;
@@ -63,7 +72,10 @@ type
    procedure Validate; virtual; abstract;
   end;
   TValidatorClass = class of TColumnDataValidator;
-
+  /// <remarks>
+  ///  данные ячейки
+  ///  фактически структура
+  /// </remarks>
   TColumnData = class sealed (TInterfacedObject)
   private
     procedure SetImageIndex(const Value: Integer);
@@ -111,6 +123,9 @@ type
     property StateImageIndex: Integer read FStateImageIndex write SetStateImageIndex;
   end;
 
+  /// <remarks>
+  ///  данные одного ряда
+  /// </remarks>
   IStdData = interface
   ['{492AF294-EBF8-4B46-B5D2-7215A8C7B7E8}']
     function GetColumn(Index: Integer): TColumnData;
@@ -126,7 +141,8 @@ type
   public
     constructor Create(AOwner: PVirtualNode; ColCount: Integer);
     destructor Destroy; override;
-    property Columns[Index: Integer]: TColumnData read GetColumn;
+    property Columns[Index: Integer]: TColumnData read GetColumn; default;
+    property Owner: PVirtualNode read FOwner;
   end;
 
   // Our own edit link to implement several different node editors.
@@ -150,8 +166,15 @@ type
   end;
 
 //----------------------------------------------------------------------------------------------------------------------
+procedure LogPr(const DebugMessage: string); inline;
 
 implementation
+
+procedure LogPr(const DebugMessage: string); inline;
+begin
+  OutputDebugString(PChar(DebugMessage));
+end;
+
 
 {$REGION 'TPropertyEditLink'}
 //----------------- TPropertyEditLink ----------------------------------------------------------------------------------
@@ -506,6 +529,7 @@ end;
 destructor TStdData.Destroy;
 begin
   inherited;
+//  LogPr(Columns[0].Value + '   '+ Columns[1].Value);
 end;
 
 function TStdData.GetColumn(Index: Integer): TColumnData;

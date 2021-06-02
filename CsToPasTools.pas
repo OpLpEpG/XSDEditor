@@ -5,6 +5,11 @@ interface
 uses System.SysUtils, CsToPas;
 
 const
+ XS_INST_LOC = 'schemaLocation';
+ XS_INST_NOLOC = 'noNamespaceSchemaLocation';
+ XS_INST = 'http://www.w3.org/2001/XMLSchema-instance';
+ XS_NS = 'http://www.w3.org/2000/xmlns/';
+
  XSTimeData = [
         tcDuration,
         tcDateTime,
@@ -119,6 +124,18 @@ begin
   if not c.SimpleContentModel then Result := 'complex'
   else Result := 'simple';
   Result := Result + DmToString((c as IXmlSchemaType).DerivedBy);
+end;
+
+function XFindElement(sd: IXmlSchemaSet; const Name: string; out e: IXmlSchemaElement): Boolean;
+begin
+  Result := False;
+  for var s in XSchemas(sd.Schemas) do
+   for var se in XElements(s.Elements) do
+    if SameText(e.Name, Name) then
+     begin
+      e := se;
+      Exit(True);
+     end;
 end;
 
 end.

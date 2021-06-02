@@ -37,6 +37,11 @@ type
     N1: TMenuItem;
     save1: TMenuItem;
     sb: TStatusBar;
+    menuFileDir: TMenuItem;
+    N3: TMenuItem;
+    SaveFile: TSaveDialog;
+    mmOptions: TMenuItem;
+    mmSetup: TMenuItem;
     procedure TreeGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
     procedure TreeGetNodeDataSize(Sender: TBaseVirtualTree; var NodeDataSize: Integer);
     procedure TreeEditing(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; var Allowed: Boolean);
@@ -52,23 +57,25 @@ type
     procedure TreeFocusChanging(Sender: TBaseVirtualTree; OldNode, NewNode: PVirtualNode; OldColumn, NewColumn: TColumnIndex; var Allowed: Boolean);
     procedure TreeBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex; CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
     procedure TreeGetPopupMenu(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; const P: TPoint;     var AskParent: Boolean; var PopupMenu: TPopupMenu);
-    procedure EmptyClick(Sender: TObject);
     procedure TreeExpanding(Sender: TBaseVirtualTree; Node: PVirtualNode; var Allowed: Boolean);
     procedure TreeNodeClick(Sender: TBaseVirtualTree; const HitInfo: THitInfo);
+    procedure StorageAfterRestorePlacement(Sender: TObject);
+    procedure StorageBeforeSavePlacement(Sender: TObject);
+    procedure EmptyClick(Sender: TObject);
     procedure menuNewClick(Sender: TObject);
     procedure menuOpenClick(Sender: TObject);
     procedure menuSchDirClick(Sender: TObject);
     procedure menuSchOpenClick(Sender: TObject);
     procedure menuNameSpaceClick(Sender: TObject);
-    procedure StorageAfterRestorePlacement(Sender: TObject);
-    procedure StorageBeforeSavePlacement(Sender: TObject);
     procedure menuSaveClick(Sender: TObject);
+    procedure menuFileDirClick(Sender: TObject);
+    procedure mmSetupClick(Sender: TObject);
   private
     { Private declarations }
-
     FValidator: IXmlSchemaValidator;
 //    procedure ValidationCallback(SeverityType: XmlSeverityType; ErrorMessage: PChar); safecall;
     procedure SetNewSchema(const scName: string);
+    procedure LoadNewFile(const flName: string);
     procedure WMStartEditing(var Message: TMessage); message WM_STARTEDITING;
   public
     { Public declarations }
@@ -80,12 +87,7 @@ type
     ns: IXmlNamespaceManager;
 //    doc: IXMLSchemaDoc;
     doc_Exam: IXMLDocument;
-    procedure ClearTree;
-    procedure TreeUpdate(root: IXmlSchemaElement);
     property Validator: IXmlSchemaValidator read FValidator implements IXmlSchemaValidator;
-  published
-//    property CTree: Integer read GetCTree write SetCTree;
-
   end;
 
 var
@@ -109,7 +111,7 @@ const
 
 implementation
 
-uses EditorLink.XSD, EditorLink.Eml, XSDEditor.Hint;
+uses EditorLink.XSD, EditorLink.Eml, XSDEditor.Hint, XSDTreeData.ReadWriteValidate, XSDEditor.Setup;
 
 {$R *.dfm}
 
@@ -122,12 +124,11 @@ procedure TFormXSD.SetNewSchema(const scName: string);
 begin
   GetXmlSchemaSet(sd);
   sd.Add(nil, PChar(scName));
-//  sd.Add(nil, LOG);
   sd.Compile;
   TTreeData.SchemaSet := sd;
 
   ns := sd.CreateNamespace();
-  DefaultNameSpase(ns);
+  DefaultEmlSpace(ns);
   FValidator := sd.Validator(ns);
   Tree.Clear;
   for var s in XSchemas(sd.Schemas) do
@@ -140,12 +141,19 @@ begin
         if SameText(e.Name, de) then
          begin
           AddElement(Tree, nil, e);
-//          TreeUpdate(e);
           Break;
          end;
       Break;
      end;
    end;
+end;
+
+procedure TFormXSD.LoadNewFile(const flName: string);
+ var
+  v: TValidatorLoader;
+begin
+  v := TValidatorLoader.Create(Tree, sd, ns);
+  v.read(flName);
 end;
 
 procedure TFormXSD.StorageAfterRestorePlacement(Sender: TObject);
@@ -161,7 +169,6 @@ begin
    begin
     Storage.StoredValue['SCHEMA_DIR'] := WITS_DIR;
    end;
-
 //  ShowAnnotation := True;
 //  Screen.HintFont.Size := 8;
   ParentTypeAnnotation := True;
@@ -169,7 +176,13 @@ begin
   IgnoreAnnotations := ['AbstractString','AbstractObject', 'TypeEnum'];
   TDirectory.SetCurrentDirectory(Storage.StoredValue['SCHEMA_DIR']);
 
-  SetNewSchema(Storage.StoredValue['SCHEMA_FILE']);
+  Tree.BeginUpdate;
+  try
+   SetNewSchema(Storage.StoredValue['SCHEMA_FILE']);
+   LoadNewFile(Storage.StoredValue['FILE_NAME']);
+  finally
+   Tree.EndUpdate;
+  end;
 
   ConnectXSDTreeHintAdapter(Self);
 end;
@@ -193,7 +206,13 @@ end;
 
 procedure TFormXSD.menuOpenClick(Sender: TObject);
 begin
-//
+
+  OpenFile.InitialDir := Storage.StoredValue['FILE_DIR'];
+  if OpenFile.Execute(Handle) then
+   begin
+    Storage.StoredValue['FILE_NAME'] := OpenFile.FileName;
+    LoadNewFile(OpenFile.FileName);
+   end;
 end;
 
 procedure TFormXSD.menuSchOpenClick(Sender: TObject);
@@ -201,22 +220,42 @@ begin
   OpenFile.InitialDir := Storage.StoredValue['SCHEMA_DIR'];
   if OpenFile.Execute(Handle) then
    begin
-     Storage.StoredValue['SCHEMA_FILE'] := OpenFile.FileName;
-     SetNewSchema(OpenFile.FileName);
+    Storage.StoredValue['SCHEMA_FILE'] := OpenFile.FileName;
+    SetNewSchema(OpenFile.FileName);
    end;
+end;
+
+procedure TFormXSD.mmSetupClick(Sender: TObject);
+begin
+  FormSetup.Show;
 end;
 
 procedure TFormXSD.menuSaveClick(Sender: TObject);
 begin
-      //
+  SaveFile.InitialDir := Storage.StoredValue['FILE_DIR'];
+  if SaveFile.Execute(Handle) then
+   begin
+    // SaveNewFile(SaveFile.FileName);
+    Storage.StoredValue['FILE_NAME'] := SaveFile.FileName;
+   end;
 end;
 
 procedure TFormXSD.menuSchDirClick(Sender: TObject);
 begin
+  SelectDir.InitialDir := Storage.StoredValue['SCHEMA_DIR'];
   if SelectDir.Execute(Handle) then
    begin
     Storage.StoredValue['SCHEMA_DIR'] := SelectDir.Directory;
     TDirectory.SetCurrentDirectory(SelectDir.Directory);
+   end;
+end;
+
+procedure TFormXSD.menuFileDirClick(Sender: TObject);
+begin
+  SelectDir.InitialDir := Storage.StoredValue['FILE_DIR'];
+  if SelectDir.Execute(Handle) then
+   begin
+    Storage.StoredValue['FILE_DIR'] := SelectDir.Directory;
    end;
 end;
 
@@ -225,43 +264,18 @@ begin
 //
 end;
 
-procedure TFormXSD.ClearTree;
+procedure TFormXSD.EmptyClick(Sender: TObject);
 begin
-  Tree.Clear;
+  var pv := PVirtualNode(Popup.Tag);
+  var tt := GetTD(PVirtualNode(Popup.Tag));
+  if tt is TTypedTreeData then
+   begin
+    (tt as TTypedTreeData).Empty(Tree);
+    TDocData.New(tree, pv, (tt as TTypedTreeData).Annotated);
+   end;
 end;
 
-procedure TFormXSD.TreeUpdate(root: IXmlSchemaElement);
-begin
-  Tree.BeginUpdate;
-  try
-//   var epv := AddElement(Tree, nil, root);
-//   var e := TElemData(GetTD(epv));
-//   Include(epv.States, vsExpanded);
-//   if Assigned(e.Complex) then
-//    begin
-//     AddComplexType(Tree, epv, e.Complex);
-//     e.ChildAddToTree := True;
-//    end;
-//   Exclude(epv.States, vsExpanded);
-  // Include(epv.States, vsExpanded);
-  finally
-   Tree.EndUpdate;
-  end;
-end;
-
-//procedure TFormXSD.TST_SaveTmpFile(Fname: string);
-//begin
-//  sd := doc.SchemaDef;
-//  TDirectory.SetCurrentDirectory(TPath.GetLibraryPath);
-//  sd.SchemaDoc.SaveToFile(Fname + '.xsd');
-//  TDirectory.SetCurrentDirectory(WITS_DIR);
-//end;
-
-//procedure TFormXSD.ValidationCallback(SeverityType: XmlSeverityType; ErrorMessage: PChar);
-//begin
-//  raise Exception.Create('=ST: {'+TRttiEnumerationType.GetName(SeverityType) + '} MSG: '+ ErrorMessage +'"');
-//end;
-
+{$REGION 'VirtualTree events'}
 procedure TFormXSD.TreeGetNodeDataSize(Sender: TBaseVirtualTree; var NodeDataSize: Integer);
 begin
   NodeDataSize := SizeOf(IStdData);
@@ -273,14 +287,6 @@ procedure TFormXSD.TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
 begin
   nd := Tree.GetNodeData(Node);
   Finalize(nd^);
-end;
-
-procedure TFormXSD.EmptyClick(Sender: TObject);
-begin
-  var pv := PVirtualNode(Popup.Tag);
-  var tt := GetTD(PVirtualNode(Popup.Tag));
-  (tt as TTypedTreeData).Empty(Tree);
-  TDocData.New(tree, pv, tt.Annotated);
 end;
 
 procedure TFormXSD.TreeGetPopupMenu(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; const P: TPoint; var AskParent: Boolean; var PopupMenu: TPopupMenu);
@@ -369,7 +375,8 @@ end;
 
 procedure TFormXSD.TreeNodeClick(Sender: TBaseVirtualTree; const HitInfo: THitInfo);
 begin
-  GetTD(HitInfo.HitNode).OnClick(Sender, HitInfo);
+  var d := GetTD(HitInfo.HitNode);
+  if d is TTreeData then (d as TTreeData).OnClick(Sender, HitInfo);
 end;
 
 procedure TFormXSD.TreeGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
@@ -425,7 +432,6 @@ begin
   TargetCanvas.Font.Style := nd.Columns[Column].FontStyles;
   TargetCanvas.Font.Color := nd.Columns[Column].FontColor;
 end;
-
-initialization
+{$ENDREGION}
 
 end.

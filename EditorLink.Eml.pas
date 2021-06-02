@@ -22,6 +22,9 @@ const
 //'xsi:schemaLocation="http://www.energistics.org/energyml/data/witsmlv2 file:///C:/repositories/witsml/v2.0/xsd_schemas/Well.xsd"
 
 type
+  /// <remarks>
+  ///   специализированный TTreeEditLink для eml (energistics) стандартных типов
+  /// </remarks>
   TEmlEditorLink = class (TXSDEditLink)
    public
    class function GetEditorType(SchemaType: IXmlSchemaType): TDataEditorClass; override;
@@ -34,13 +37,13 @@ type
    procedure SetBounds(var R: TRect); override;
   end;
 
-procedure DefaultNameSpase(m: IXmlNamespaceManager);
+procedure DefaultEmlSpace(m: IXmlNamespaceManager);
 implementation
 
 uses XSDEditor;
 
 
-procedure DefaultNameSpase(m: IXmlNamespaceManager);
+procedure DefaultEmlSpace(m: IXmlNamespaceManager);
 begin
   m.AddNamespace('', EML_NS_WITS_DEFAULT);
   for var a in EML_NS do

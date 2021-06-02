@@ -6,7 +6,6 @@ uses  System.SysUtils, System.UITypes, System.Rtti, Classes,  System.Generics.Co
       Vcl.Graphics,
       VirtualTrees,
       Winapi.Windows,
-
       EditorLink.Base, CsToPas, CsToPasTools;
 
 
@@ -47,6 +46,12 @@ const
          (([fsBold], []),
           ([fsBold], [fsBold, fsUnderline]));
 type
+  TBadData = class sealed(TStdData)
+  public
+    constructor Create(Tree: TBaseVirtualTree; root: PVirtualNode; Ins: Boolean;
+                 const Name, Value: string);
+  end;
+
   TIndexColumn = Integer;
   /// <remarks>
   ///   базовый класс данных VirtualTree (элемента XML схеммы)
@@ -77,6 +82,9 @@ type
 
   TTypedTreeData = class;
   TElemData = class;
+  /// <remarks>
+  ///   проверяет данные CSharp валидатором
+  /// </remarks>
   TTypedDataValidator = class(TColumnDataValidator, IXMLValidatorCallBack)
   private
     schemaInfo: IXmlSchemaInfo;
@@ -222,51 +230,70 @@ type
     property Paticle: IXmlSchemaParticle read GetPaticle implements IXmlSchemaParticle;
     property ChildAddToTree: Boolean read FChildAddToTree write FChildAddToTree;
   end;
-
-  TChoiceElem = class sealed(TElemData, IXmlSchemaChoice)
-  private
-    FChoice: TArray<IXmlSchemaElement>;
-    FCurrent: Integer;
-    function GetChoice: IXmlSchemaChoice;
-    procedure SetCurrent(const Value: Integer);
-    function GetCount: Integer;
+  /// <remarks>
+  ///  Choice - выбираем элемент (его тип)
+  ///  Abstract - выбираем тип (необстрактные наследники)
+  /// </remarks>
+  TUserSelectElem = class abstract(TElemData)
   protected
-    procedure UpdateViewType;
-    function GetSchemaObject: IXmlSchemaObject; override;
-    function GetElem: IXmlSchemaElement; override;
-    class function New(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IInterface; Ins: Boolean = False): PVirtualNode; override;
+    FCurrent: Integer;
+    function GetCount: Integer; virtual; abstract;
+    procedure SetCurrent(const Value: Integer); virtual; abstract;
   public
-    constructor Create(AOwner: PVirtualNode; ANode: IInterface); override;
-    procedure AfterConstruction; override;
-    property Choice: IXmlSchemaChoice read GetChoice implements IXmlSchemaChoice;
-    property Choices: TArray<IXmlSchemaElement> read FChoice;
+    procedure SetUserType(const name, space: string); virtual; abstract;
     property Current: Integer read FCurrent write SetCurrent;
     property Count: Integer read GetCount;
   end;
 
-  TAbstractElem = class sealed(TElemData)
+  TChoiceElem = class sealed(TUserSelectElem, IXmlSchemaChoice)
+  private
+    FChoice: TArray<IXmlSchemaElement>;
+    function GetChoice: IXmlSchemaChoice;
   protected
-    function GetType: IXmlSchemaType; override;
-    class function New(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IInterface; Ins: Boolean = False): PVirtualNode; override;
+    procedure SetCurrent(const Value: Integer); override;
+    function GetCount: Integer; override;
+    procedure UpdateViewType;
+    function GetSchemaObject: IXmlSchemaObject; override;
+    function GetElem: IXmlSchemaElement; override;
   public
-    FUserTypes: TArray<IXmlSchemaComplexType>;
-    FCurrent: Integer;
     constructor Create(AOwner: PVirtualNode; ANode: IInterface); override;
     procedure AfterConstruction; override;
-    property BaseAbstract: IXmlSchemaComplexType read GetComplex;
+    procedure SetUserType(const name, space: string); override;
+    class function New(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IInterface; Ins: Boolean = False): PVirtualNode; override;
+    property Choice: IXmlSchemaChoice read GetChoice implements IXmlSchemaChoice;
+    property Choices: TArray<IXmlSchemaElement> read FChoice;
   end;
 
-function GetTD(pv: PVirtualNode): TTreeData; inline;
+  TAbstractElem = class sealed(TUserSelectElem)
+  protected
+    FUserTypes: TArray<IXmlSchemaComplexType>;
+    procedure UpdateViewType;
+    function GetType: IXmlSchemaType; override;
+    procedure SetCurrent(const Value: Integer); override;
+    function GetCount: Integer; override;
+    class function New(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IInterface; Ins: Boolean = False): PVirtualNode; override;
+  public
+    constructor Create(AOwner: PVirtualNode; ANode: IInterface); override;
+    procedure AfterConstruction; override;
+    procedure SetUserType(const name, space: string); override;
+    property BaseAbstract: IXmlSchemaComplexType read GetComplex;
+    property UserTypes: TArray<IXmlSchemaComplexType> read FUserTypes;
+  end;
+
+function GetTD(pv: PVirtualNode): TStdData; inline;
+
 function AddElement(Tree: TBaseVirtualTree; root: PVirtualNode; e: IXmlSchemaElement; Ins: Boolean = False): PVirtualNode;
+procedure AddAttributes(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IXmlSchemaComplexType);
+procedure AddPaticles(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IXmlSchemaComplexType);
 procedure AddComplexType(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IXmlSchemaComplexType);
 
 implementation
 
 uses EditorLink.XSD;
 
-function GetTD(pv: PVirtualNode): TTreeData; inline;
+function GetTD(pv: PVirtualNode): TStdData; inline;
 begin
-  Result := PStdData(pv.GetData)^ as TTreeData;
+  Result := PStdData(pv.GetData)^ as TStdData;
 end;
 
 function AddElement(Tree: TBaseVirtualTree; root: PVirtualNode; e: IXmlSchemaElement; ins: Boolean): PVirtualNode;
@@ -279,10 +306,15 @@ begin
      Result := TElemData.New(Tree, root, e, ins)
 end;
 
-procedure AddComplexType(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IXmlSchemaComplexType);
+procedure AddAttributes(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IXmlSchemaComplexType);
+begin
+  for var a in XAttributes(xml.AttributeUses.Values) do TAttrData.New(Tree, root, a);
+end;
+
+procedure AddPaticles(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IXmlSchemaComplexType);
   procedure AddAny(r: PVirtualNode; sc: IXmlSchemaAny);
   begin
-    raise Exception.Create('Error Message procedure AddAny(r: PVirtualNode; sc: IXmlSchemaAny)');
+    raise Exception.Create('[procedure AddAny(r: PVirtualNode; sc: IXmlSchemaAny)] xs:any и xs:anyAttribute пока не поддерживаются ');
   end;
   procedure AddPaticle(r: PVirtualNode; sc: IXmlSchemaObjectCollection);
    var
@@ -303,7 +335,6 @@ procedure AddComplexType(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IXmlSc
   pa: IXmlSchemaAll;
   pc: IXmlSchemaChoice;
 begin
-  for var a in XAttributes(xml.AttributeUses.Values) do TAttrData.New(Tree, root, a);
   case xml.ContentType of
     scElementOnly:
      begin
@@ -314,6 +345,12 @@ begin
      end;
     scMixed: raise Exception.Create('Error Message scMixedscMixedscMixed scMixed scMixed scMixed');
   end;
+end;
+
+procedure AddComplexType(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IXmlSchemaComplexType);
+begin
+  AddAttributes(Tree,root,xml);
+  AddPaticles(Tree,root,xml);
 end;
 
 {$REGION 'TTypedDataValidator'}
@@ -415,6 +452,30 @@ begin
 end;
 {$ENDREGION}
 
+{ TBadData }
+
+constructor TBadData.Create(Tree: TBaseVirtualTree; root: PVirtualNode; Ins: Boolean; const Name, Value: string);
+ var
+  pv: PVirtualNode;
+  nd: PStdData;
+begin
+  if Ins then pv := Tree.InsertNode(root, amInsertAfter)
+  else pv := Tree.AddChild(root);
+  inherited Create(pv, COLL_COUNT);
+  nd := pv.GetData;
+  nd^ := self as IStdData;
+  Columns[COLL_TREE].Value := Name;
+  Columns[COLL_TREE].IsValid := False;
+  Columns[COLL_TREE].FontColor := clRed;
+  Columns[COLL_TREE].FontStyles := [fsBold];
+  Columns[COLL_VAL].Value := Value;
+  Columns[COLL_VAL].IsValid := False;
+  Columns[COLL_VAL].FontColor := clRed;
+  Columns[COLL_VAL].FontStyles := [fsBold];
+//  Tree.InvalidateNode(pv);
+end;
+
+
 {$REGION 'abstract TTreeData'}
 
 { TTreeData }
@@ -465,7 +526,7 @@ class function TDocData.New(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IIn
   rt: TTreeData;
 begin
   Result := nil;
-  rt := GetTD(root);
+  rt := GetTD(root) as TTreeData;
   var doc := rt.GetAnnotation();
   if doc <> '' then
    begin
@@ -522,6 +583,7 @@ end;
 procedure TTypedTreeData.UpdateValueColumn;
 begin
   Columns[COLL_VAL].BrashColor := BRUSH_VAL_COLOR[IsRequired, IsEmpty, IsValid];
+ // LogPr(Name + ' IsValid: '+ BoolToStr(IsValid))
 end;
 
 procedure TTypedTreeData.UpdateValueView({Tree: TBaseVirtualTree; ColumnData: TColumnData});
@@ -559,8 +621,8 @@ end;
 function TTypedTreeData.GetEmpty: Boolean;
 begin
   if HasFixed then Exit(True)
-  else if HasDefault then Exit(SameStr(string(Columns[COLL_VAL].Value), DefaultValue))
-       else Exit(SameStr(string(Columns[COLL_VAL].Value).Trim, ''));
+  else // if HasDefault then Exit(SameStr(string(Columns[COLL_VAL].Value), DefaultValue)) else
+       Exit(SameStr(string(Columns[COLL_VAL].Value).Trim, ''));
 end;
 
 function TTypedTreeData.GetHasChild: Boolean;
@@ -734,7 +796,8 @@ begin
   while Result and Assigned(c) do
    begin
     var d := GetTD(c);
-    if d is TTypedTreeData then Result := Result and (d as TTypedTreeData).IsValid;
+    if d is TBadData then Result := False
+    else if d is TTypedTreeData then Result := Result and (d as TTypedTreeData).IsValid;
     c := c.NextSibling;
    end;
 end;
@@ -861,7 +924,13 @@ end;
 
 function TElemData.GetValid: Boolean;
 begin
-  Result := not IsRequired or (inherited and GetChildValid);
+  var cv := GetChildValid;
+  if (Content <> scTextOnly) and cv and not Columns[COLL_VAL].IsValid then
+   begin
+    Columns[COLL_VAL].IsValid := True;
+    Columns[COLL_VAL].ValidateErrorMsg := '';
+   end;
+  Result := not IsRequired or (inherited and cv);
 end;
 
 function TElemData.GetPaticle: IXmlSchemaParticle;
@@ -882,9 +951,9 @@ begin
   if hiOnStateIcon in HitInfo.HitPositions then
    begin
     var ae := GetManyExistsItems;
-    if Length(ae) > 1 then Sender.DeleteNode(FOwner);
+    if Length(ae) > 1 then Sender.DeleteNode(Owner);
    end
-  else if hiOnNormalIcon in HitInfo.HitPositions then AddElement(Sender, FOwner, Elem, True);
+  else if hiOnNormalIcon in HitInfo.HitPositions then AddElement(Sender, Owner, Elem, True);
 end;
 {$ENDREGION}
 
@@ -937,6 +1006,22 @@ begin
   FCurrent := Value;
   FType := FChoice[FCurrent].ElementSchemaType;
 end;
+
+procedure TChoiceElem.SetUserType(const name, space: string);
+begin
+  for var i := 0 to Length(Choices)-1 do
+   begin
+    var t := Choices[i].ElementSchemaType;
+    var ns := string(t.QualifiedName.Namespace);
+    var n := string(t.QualifiedName.Name);
+    if SameText(n, name) and SameText(ns, space) then
+     begin
+      Current := i;
+      Exit;
+     end;
+   end;
+end;
+
 procedure TChoiceElem.UpdateViewType;
 begin
   UpdateTreeColumn;
@@ -967,8 +1052,14 @@ begin
     else raise Exception.Create('Error Message  constructor TAbstractElem.Create(AOwner: PVirtualNode; ANode: IInterface);');
    end;
   Columns[COLL_TYPE].EditType := TAbstractTypeEditor;
+  Columns[COLL_TYPE].UpdateViewDataFunc := UpdateViewType;
 end;
 
+
+function TAbstractElem.GetCount: Integer;
+begin
+  Result := Length(FUserTypes);
+end;
 
 function TAbstractElem.GetType: IXmlSchemaType;
 begin
@@ -980,6 +1071,32 @@ class function TAbstractElem.New(Tree: TBaseVirtualTree; root: PVirtualNode; xml
 begin
   Result := inherited;
 end;
+procedure TAbstractElem.SetCurrent(const Value: Integer);
+begin
+  FCurrent := Value;
+end;
+
+procedure TAbstractElem.SetUserType(const name, space: string);
+begin
+  for var i := 0 to Length(UserTypes)-1 do
+   begin
+    var t := UserTypes[i] as IXmlSchemaType;
+    var ns := string(t.QualifiedName.Namespace);
+    var n := string(t.QualifiedName.Name);
+    if SameText(n, name) and SameText(ns, space) then
+     begin
+      Current := i;
+      Exit;
+     end;
+   end;
+end;
+
+procedure TAbstractElem.UpdateViewType;
+begin
+  if FCurrent = -1 then Columns[COLL_TYPE].FontColor := clRed
+  else Columns[COLL_TYPE].FontColor := clGreen;
+end;
+
 {$ENDREGION}
 
 end.

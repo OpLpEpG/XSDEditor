@@ -1514,6 +1514,7 @@ end;
     procedure ValidationCallback(SeverityType: XmlSeverityType; ErrorMessage: PChar); safecall;
     function GetSelf(): TXMLValidatorCallBack; safecall;
     procedure SetSelf(s: TXMLValidatorCallBack); safecall;
+    property this: TXMLValidatorCallBack read GetSelf write SetSelf;
  end;
 
  IXmlNamespaceManager = interface // IXMLEnumerable prefixes
@@ -1668,11 +1669,12 @@ end;
   ///
   /// Возврат:
   ///     Объект System.Xml.Schema.XmlSchemaContentType.
-  function ContentType(): XmlSchemaContentType; safecall;
+  function GetContentType(): XmlSchemaContentType; safecall;
 
   property Validity: XmlSchemaValidity read GetValidity;
   property IsDefault: Boolean read GetIsDefault;
   property IsNil: Boolean read GetIsNil;
+  property ContentType: XmlSchemaContentType read GetContentType;
  end;
 
  IXmlReader = interface

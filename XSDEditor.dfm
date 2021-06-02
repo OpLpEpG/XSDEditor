@@ -72,7 +72,6 @@ object FormXSD: TFormXSD
     OnInitNode = TreeInitNode
     OnMeasureItem = TreeMeasureItem
     OnNodeClick = TreeNodeClick
-    ExplicitHeight = 679
     Columns = <
       item
         Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coShowDropMark, coVisible, coAutoSpring, coAllowFocus]
@@ -105,9 +104,6 @@ object FormXSD: TFormXSD
     Width = 775
     Height = 19
     Panels = <>
-    ExplicitLeft = 416
-    ExplicitTop = 664
-    ExplicitWidth = 0
   end
   object TreeImages: TImageList
     Height = 12
@@ -1481,42 +1477,60 @@ object FormXSD: TFormXSD
     end
   end
   object mm: TMainMenu
+    Images = TreeImages
     Left = 160
     Top = 32
     object newfile: TMenuItem
-      Caption = 'file'
+      Caption = 'File'
+      ImageIndex = 1
+      object menuFileDir: TMenuItem
+        Caption = 'File Dir...'
+        ImageIndex = 1
+        OnClick = menuFileDirClick
+      end
       object menuNew: TMenuItem
-        Caption = 'new'
+        Caption = 'New'
         OnClick = menuNewClick
       end
       object menuOpen: TMenuItem
-        Caption = 'open...'
+        Caption = 'Open...'
         OnClick = menuOpenClick
       end
       object N1: TMenuItem
         Caption = '-'
       end
       object save1: TMenuItem
-        Caption = 'save'
+        Caption = 'Save as...'
         OnClick = menuSaveClick
       end
     end
     object schema: TMenuItem
-      Caption = 'schema'
+      Caption = 'Schema'
       object menuSchDir: TMenuItem
-        Caption = 'schema work dir...'
+        Caption = 'Schema Work Dir...'
+        ImageIndex = 1
         OnClick = menuSchDirClick
       end
+      object N3: TMenuItem
+        Caption = '-'
+      end
       object menuSchOpen: TMenuItem
-        Caption = 'open...'
+        Caption = 'Open...'
         OnClick = menuSchOpenClick
       end
     end
     object namespace: TMenuItem
-      Caption = 'namespace'
+      Caption = 'NameSpace'
       object menuNameSpace: TMenuItem
-        Caption = 'edit...'
+        Caption = 'Edit...'
         OnClick = menuNameSpaceClick
+      end
+    end
+    object mmOptions: TMenuItem
+      Caption = 'Options'
+      object mmSetup: TMenuItem
+        Caption = 'Setup'
+        OnClick = mmSetupClick
       end
     end
   end
@@ -1557,6 +1571,14 @@ object FormXSD: TFormXSD
       item
         Name = 'SCHEMA_FILE'
         Value = 'well.xsd'
+      end
+      item
+        Name = 'FILE_DIR'
+        Value = 'uulkmnl'
+      end
+      item
+        Name = 'FILE_NAME'
+        Value = 'well.xml'
       end>
     Left = 320
     Top = 32
@@ -1568,12 +1590,18 @@ object FormXSD: TFormXSD
     FileName = 'config.xml'
     RootNodeName = 'Configuration'
     SubStorages = <>
-    Left = 392
-    Top = 32
+    Left = 320
+    Top = 88
   end
   object OpenFile: TOpenTextFileDialog
     Options = [ofReadOnly, ofPathMustExist, ofFileMustExist, ofEnableSizing]
     Left = 248
-    Top = 96
+    Top = 88
+  end
+  object SaveFile: TSaveDialog
+    DefaultExt = 'xml'
+    Options = [ofOverwritePrompt, ofHideReadOnly, ofPathMustExist, ofEnableSizing]
+    Left = 248
+    Top = 144
   end
 end

@@ -107,6 +107,11 @@ $(PostBuildEvent)]]></PostBuildEvent>
         <DCCReference Include="XSDTreeData.pas"/>
         <DCCReference Include="CsToPasTools.pas"/>
         <DCCReference Include="CsToPas.pas"/>
+        <DCCReference Include="XSDTreeData.ReadWriteValidate.pas"/>
+        <DCCReference Include="XSDEditor.Setup.pas">
+            <Form>FormSetup</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
