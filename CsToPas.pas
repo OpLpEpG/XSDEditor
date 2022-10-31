@@ -644,6 +644,7 @@ type
         Warning = 1
     );
 {$Z1} {$MINENUMSIZE 1}
+
 {$ENDREGION 'enums'}
 
  TCSharp = Pointer;
@@ -2648,6 +2649,8 @@ end;
   procedure ValidateWhitespace(elementValue: PChar); safecall;
  end;
 
+ {$ENDREGION}
+
  IXmlSchemaSet = interface
   ['{CEAD7A91-2DAC-44E1-8425-F32E1A23DCE3}']
   /// создает новый пустой NamespaceManager
@@ -2747,8 +2750,7 @@ end;
   function Validator(ns: IXmlNamespaceManager): IXmlSchemaValidator; safecall;overload;
   function DerivedFrom(baseType: IXmlSchemaType): IXmlSchemaObjectCollection; safecall;
  end;
-{$ENDREGION}
-
+{$REGION 'Funcs'}
 // functions
 procedure GetXmlSchemaSet(out XmlSchemaSet: IXmlSchemaSet); stdcall; external 'cstopas.dll';
 procedure GetCsString(obj: TCSharp;
@@ -2793,6 +2795,7 @@ function XGroups(Enum: IInterface): TXEnum<IXmlSchemaGroup>;
 function XAttributeGroups(Enum: IInterface): TXEnum<IXmlSchemaAttributeGroup>;
 function XNotations(Enum: IInterface): TXEnum<IXmlSchemaNotation>;
 function XFacets(Enum: IInterface): TXEnum<IXmlSchemaFacet>;
+{$ENDREGION}
 
 implementation
 

@@ -321,13 +321,23 @@ procedure AddPaticles(Tree: TBaseVirtualTree; root: PVirtualNode; xml: IXmlSchem
     pc: IXmlSchemaChoice;
     pe: IXmlSchemaElement;
     py: IXmlSchemaAny;
+    ps: IXmlSchemaSequence;
   begin
    for var p in XParticles(sc) do
     begin
+     if not Assigned(p) then raise Exception.Create('Error Message var p in XParticles(sc) =NIL');     
      if Supports(p, IXmlSchemaChoice, pc) then TChoiceElem.New(Tree, r, pc)
      else if Supports(p, IXmlSchemaElement, pe) then AddElement(Tree, r, pe)
      else if Supports(p, IXmlSchemaAny, py) then AddAny(r, py)
-     else raise Exception.Create('Error Message XParticles(sc)');
+     else if Supports(p, IXmlSchemaSequence, ps) then AddPaticle(r, ps.Items)
+     else 
+      begin
+       var so: IXmlSchemaObject;
+       if Supports(p, IXmlSchemaObject, so) then 
+        begin
+         raise Exception.Createfmt('Error so %s %d %d',[so.SourceUri, so.LineNumber, so.LinePosition]);
+        end;
+      end;
     end;
   end;
  var

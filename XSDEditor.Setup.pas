@@ -19,6 +19,7 @@ type
     LinkControlToPropertyEnabled: TLinkControlToProperty;
     cbUserSchema: TCheckBox;
     LinkControlToPropertyEnabled2: TLinkControlToProperty;
+    cbClseqElemName: TCheckBox;
     procedure edDirXMLChange(Sender: TObject);
     procedure edDirSchChange(Sender: TObject);
     procedure edFileSchChange(Sender: TObject);

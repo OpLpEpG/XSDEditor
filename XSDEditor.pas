@@ -138,7 +138,7 @@ begin
     if TPath.GetFileName(scName) = d then
      begin
       for var e in XElements(s.Elements) do
-        if SameText(e.Name, de) then
+        if formSetup.cbClseqElemName.Checked or SameText(e.Name, de) then
          begin
           AddElement(Tree, nil, e);
           Break;

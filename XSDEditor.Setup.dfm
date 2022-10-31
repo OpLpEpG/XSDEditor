@@ -10,13 +10,11 @@ object FormSetup: TFormSetup
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
-  OldCreateOrder = False
   Position = poMainFormCenter
   OnShow = FormShow
   DesignSize = (
     360
     224)
-  PixelsPerInch = 96
   TextHeight = 13
   object Label3: TLabel
     Left = 16
@@ -77,11 +75,22 @@ object FormSetup: TFormSetup
     State = cbChecked
     TabOrder = 4
   end
+  object cbClseqElemName: TCheckBox
+    Left = 16
+    Top = 178
+    Width = 336
+    Height = 17
+    Anchors = [akLeft, akTop, akRight]
+    Caption = #1080#1084#1103' '#1089#1083#1072#1089#1089#1072' = '#1080#1084#1103' '#1082#1086#1088#1088#1085#1077#1074#1086#1075#1086' '#1077#1083#1077#1084#1077#1085#1090#1072
+    Checked = True
+    State = cbChecked
+    TabOrder = 5
+  end
   object BindingsList: TBindingsList
     Methods = <>
     OutputConverters = <>
-    Left = 28
-    Top = 173
+    Left = 36
+    Top = 101
     object LinkControlToPropertyEnabled: TLinkControlToProperty
       Category = 'Quick Bindings'
       Control = cbUseUserPath
